@@ -21,6 +21,11 @@ class Settings(BaseSettings):
         ""  # Get from Supabase Dashboard > Project Settings > API
     )
 
+    # Render.com API (for deployments)
+    render_api_key: str = (
+        ""  # Get from: https://dashboard.render.com/u/settings?add-api-key
+    )
+
     # Sarvam Bulbul
     sarvam_api_key: str = ""
     sarvam_base_url: str = "https://api.sarvam.ai"
