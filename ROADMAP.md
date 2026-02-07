@@ -139,7 +139,7 @@ audio = await service.synthesize(
 #### 2.4 Multi-language Support (2 hours)
 - [ ] Add language switcher
 - [ ] Implement code-mixing slider
-- [ ] Test Hindi, Tamil, Bengali
+- [ ] Test English, Hindi, Kannada
 - [ ] Verify translations
 
 ---

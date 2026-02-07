@@ -181,7 +181,7 @@ git push origin feature/your-branch
 | A2.4 | Create `POST /stories/{slug}/choices` endpoint | P0 | 30m | ⬜ |
 | A2.5 | Implement `GET /audio/{node_id}` endpoint | P0 | 45m | ⬜ |
 | A2.6 | Setup R2 storage integration | P0 | 30m | ⬜ |
-| A2.7 | Generate test audio for 1 story (Hindi) | P0 | 30m | ⬜ |
+| A2.7 | Generate test audio for 1 story (Hindi, English, Kannada) | P0 | 30m | ⬜ |
 | Time | Pink Panther | Jackie Chan | Status |
 |------|--------------|-------------|--------|
 | 2:00-2:30 | `POST /auth/anonymous` | Setup API client, TanStack Query | ⬜ |
@@ -205,7 +205,7 @@ git push origin feature/your-branch
 | 4:00-4:30 | `GET /audio/{node_id}` endpoint | Create AudioPlayer component | ⬜ |
 | 4:30-5:00 | Setup Redis caching | Implement Howler.js integration | ⬜ |
 | 5:00-5:30 | Audio generation pipeline | Create /play/[storyId] page | ⬜ |
-| 5:30-6:00 | Generate 1 story audio (Hindi) | Connect player to API | ⬜ |
+| 5:30-6:00 | Generate 1 story audio (Hindi, English, Kannada) | Connect player to API | ⬜ |
 
 **🔄 SYNC (20 min):** Audio MUST play end-to-end
 
@@ -445,7 +445,7 @@ Before starting the 10-hour sprint, ensure:
 
 ### Technical (Must Have)
 - [ ] 3 complete stories with branching
-- [ ] 3+ languages (Hindi, Tamil, Bengali)
+- [ ] 3+ languages (English, Hindi, Kannada)
 - [ ] 5+ distinct character voices
 - [ ] 2+ interactive choice points per story
 - [ ] Natural code-mixing support

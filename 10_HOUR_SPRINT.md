@@ -142,7 +142,7 @@ curl http://localhost:8000/stories/clever-crow
 | 4:00-4:30 | `GET /audio/{node_id}` - audio URL endpoint | Audio endpoint |
 | 4:30-5:00 | Setup Redis caching for audio metadata | Cache working |
 | 5:00-5:30 | Implement audio generation pipeline | Generate audio on-demand |
-| 5:30-6:00 | Generate audio for 1 story (Hindi) | 5-10 audio files ready |
+| 5:30-6:00 | Generate audio for 1 story (Hindi, English, Kannada) | 5-10 audio files ready |
 
 ---
 
@@ -181,8 +181,8 @@ curl http://localhost:8000/stories/clever-crow
 
 **Stories to Write:**
 1. **The Clever Crow** (Pan-Indian)
-2. **The Kind Woodcutter** (Bengali)
-3. **Tenali Raman** (Tamil)
+2. **Punyakoti** (Kannada) - The Honest Cow
+3. **The Clever Crow** (English)
 
 ---
 
@@ -253,8 +253,8 @@ vercel --prod
 2. [ ] Install PWA
 3. [ ] Play "The Clever Crow" in Hindi
 4. [ ] Make a choice
-5. [ ] Switch to Tamil
-6. [ ] Play "Tenali Raman"
+5. [ ] Switch to English
+6. [ ] Play "The Clever Crow" in English
 7. [ ] Turn off wifi - does it still work?
 
 **If all pass = SHIP IT** 🚀
@@ -295,7 +295,7 @@ Before starting the 10-hour sprint:
 
 ### Technical
 - [ ] 1 complete story with branching (minimum)
-- [ ] 3 languages working (Hindi, Tamil, Bengali)
+- [ ] 3 languages working (English, Hindi, Kannada)
 - [ ] 2+ choice points per story
 - [ ] Audio < 1 second start time
 - [ ] Offline PWA working

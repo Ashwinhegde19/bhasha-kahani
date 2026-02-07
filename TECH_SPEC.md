@@ -427,7 +427,7 @@ jobs:
 ### Challenge Submission (Feb 11)
 
 - [ ] 3 complete stories with branching
-- [ ] 3+ languages (Hindi, Tamil, Bengali)
+- [ ] 3+ languages (English, Hindi, Kannada)
 - [ ] 5+ distinct character voices
 - [ ] 2+ interactive choice points per story
 - [ ] Natural code-mixing support
