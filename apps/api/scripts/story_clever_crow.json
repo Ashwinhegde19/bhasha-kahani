@@ -1,0 +1,213 @@
+{
+  "slug": "clever-crow",
+  "age_range": "4-8",
+  "region": "pan-indian",
+  "moral": "Intelligence and persistence solve problems",
+  "duration_min": 4,
+  "cover_image": "https://cdn.bhashakahani.com/stories/clever-crow/cover.jpg",
+  "translations": {
+    "en": {
+      "title": "The Clever Crow",
+      "description": "A thirsty crow finds a pot with little water. Watch how intelligence solves the problem!"
+    },
+    "hi": {
+      "title": "चालाक कौआ",
+      "description": "एक प्यासा कौआ कम पानी वाले बर्तन को देखता है। देखिए कैसे बुद्धि समस्या को हल करती है!"
+    },
+    "kn": {
+      "title": "ಚತುರ ಕಾಗೆ",
+      "description": "ಬಾಯಾರಿದ ಕಾಗೆ ಕಡಿಮೆ ನೀರಿರುವ ಪಾತ್ರೆಯನ್ನು ಕಾಣುತ್ತದೆ. ಬುದ್ಧಿವಂತಿಕೆ ಹೇಗೆ ಸಮಸ್ಯೆಯನ್ನು ಪರಿಹರಿಸುತ್ತದೆ ಎಂಬುದನ್ನು ನೋಡಿ!"
+    }
+  },
+  "characters": [
+    {
+      "slug": "narrator",
+      "name": "Dadi",
+      "voice_profile": "warm_elderly",
+      "bulbul_speaker": "meera",
+      "avatar_url": "https://cdn.bhashakahani.com/characters/dadi.png"
+    },
+    {
+      "slug": "crow",
+      "name": "Kauva",
+      "voice_profile": "young_energetic",
+      "bulbul_speaker": "arvind",
+      "avatar_url": "https://cdn.bhashakahani.com/characters/crow.png"
+    }
+  ],
+  "nodes": [
+    {
+      "node_type": "narration",
+      "character_slug": "narrator",
+      "display_order": 1,
+      "is_start": true,
+      "is_end": false,
+      "text": {
+        "en": "Once upon a time, on a very hot summer day, a thirsty crow was flying in search of water.",
+        "hi": "एक बार की बात है, एक बहुत गर्म गर्मी के दिन, एक प्यासा कौआ पानी की तलाश में उड़ रहा था।",
+        "kn": "ಒಮ್ಮೆ, ಬಹಳ ಬಿಸಿಲಿನ ದಿನ, ಬಾಯಾರಿದ ಕಾಗೆ ನೀರಿನ ಹುಡುಕಾಟದಲ್ಲಿ ಹಾರಾಡುತ್ತಿತ್ತು."
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "crow",
+      "display_order": 2,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "I am so thirsty! I need to find water quickly or I will faint!",
+        "hi": "मैं बहुत प्यासा हूं! मुझे जल्दी पानी ढूंढना होगा वरना मैं बेहोश हो जाऊंगा!",
+        "kn": "ನಾನು ಬಹಳ ಬಾಯಾರಿದ್ದೇನೆ! ನಾನು ಬೇಗ ನೀರು ಹುಡುಕಬೇಕು, ಇಲ್ಲದಿದ್ದರೆ ನಾನು ಮೂರ್ಛೆಹೋಗುತ್ತೇನೆ!"
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "narrator",
+      "display_order": 3,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "After flying for a long time, the crow spotted a pot on the ground. He flew down to investigate.",
+        "hi": "बहुत देर तक उड़ने के बाद, कौए ने जमीन पर एक बर्तन देखा। वह जांचने के लिए नीचे उड़ा।",
+        "kn": "ಬಹಳ ಹೊತ್ತು ಹಾರಿದ ನಂತರ, ಕಾಗೆ ನೆಲದ ಮೇಲೆ ಒಂದು ಪಾತ್ರೆಯನ್ನು ಕಂಡಿತು. ಪರೀಕ್ಷಿಸಲು ಅದು ಕೆಳಗೆ ಹಾರಿತು."
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "crow",
+      "display_order": 4,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "Oh! There is a pot! Let me check if there is water inside.",
+        "hi": "ओह! एक बर्तन है! चलो देखूं कि अंदर पानी है या नहीं।",
+        "kn": "ಓಹ್! ಒಂದು ಪಾತ್ರೆ ಇದೆ! ಒಳಗೆ ನೀರು ಇದೆಯೇ ಎಂದು ನೋಡೋಣ."
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "narrator",
+      "display_order": 5,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "The crow looked inside the pot. There was water at the bottom, but the pot was too deep and the water level was too low.",
+        "hi": "कौए ने बर्तन के अंदर देखा। नीचे पानी था, लेकिन बर्तन बहुत गहरा था और पानी का स्तर बहुत कम था।",
+        "kn": "ಕಾಗೆ ಪಾತ್ರೆಯ ಒಳಗೆ ನೋಡಿತು. ಕೆಳಭಾಗದಲ್ಲಿ ನೀರು ಇತ್ತು, ಆದರೆ ಪಾತ್ರೆ ತುಂಬಾ ಒಳಗಿತ್ತು ಮತ್ತು ನೀರಿನ ಮಟ್ಟ ತುಂಬಾ ಕಡಿಮೆ ಇತ್ತು."
+      }
+    },
+    {
+      "node_type": "choice",
+      "character_slug": "crow",
+      "display_order": 6,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "The water is too low! I cannot reach it with my beak. What should I do?",
+        "hi": "पानी बहुत नीचे है! मैं अपनी चोंच से उस तक नहीं पहुंच सकता। मुझे क्या करना चाहिए?",
+        "kn": "ನೀರು ತುಂಬಾ ಕೆಳಗೆ ಇದೆ! ನಾನು ನನ್ನ ಕೊಕ್ಕಿನಿಂದ ಅದನ್ನು ತಲುಪಲಾಗುವುದಿಲ್ಲ. ನಾನು ಏನು ಮಾಡಬೇಕು?"
+      },
+      "choices": [
+        {
+          "choice_key": "A",
+          "text": {
+            "en": "Drop stones in the pot to raise water level",
+            "hi": "पानी के स्तर को बढ़ाने के लिए बर्तन में पत्थर डालें",
+            "kn": "ನೀರಿನ ಮಟ್ಟವನ್ನು ಹೆಚ್ಚಿಸಲು ಪಾತ್ರೆಗೆ ಕಲ್ಲುಗಳನ್ನು ಹಾಕಿ"
+          },
+          "next_node_order": 7
+        },
+        {
+          "choice_key": "B",
+          "text": {
+            "en": "Try to tip the pot over",
+            "hi": "बर्तन को उल्टा करने की कोशिश करें",
+            "kn": "ಪಾತ್ರೆಯನ್ನು ಉಲ್ಟು ಮಾಡಲು ಪ್ರಯತ್ನಿಸಿ"
+          },
+          "next_node_order": 8
+        },
+        {
+          "choice_key": "C",
+          "text": {
+            "en": "Look for another water source",
+            "hi": "दूसरे पानी के स्रोत की तलाश करें",
+            "kn": "ಬೇರೆ ನೀರಿನ ಮೂಲವನ್ನು ಹುಡುಕಿ"
+          },
+          "next_node_order": 9
+        }
+      ]
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "narrator",
+      "display_order": 7,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "The clever crow started dropping small stones into the pot. Slowly, the water level began to rise.",
+        "hi": "चालाक कौए ने बर्तन में छोटे पत्थर डालने शुरू कर दिए। धीरे-धीरे, पानी का स्तर बढ़ने लगा।",
+        "kn": "ಚತುರ ಕಾಗೆ ಪಾತ್ರೆಗೆ ಚಿಕ್ಕ ಕಲ್ಲುಗಳನ್ನು ಹಾಕಲು ಪ್ರಾರಂಭಿಸಿತು. ನಿಧಾನವಾಗಿ, ನೀರಿನ ಮಟ್ಟ ಏರಲು ಪ್ರಾರಂಭಿಸಿತು."
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "crow",
+      "display_order": 8,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "The pot is too heavy! I cannot tip it over. This idea did not work.",
+        "hi": "बर्तन बहुत भारी है! मैं इसे उल्टा नहीं कर सकता। यह विचार काम नहीं किया।",
+        "kn": "ಪಾತ್ರೆ ತುಂಬಾ ಭಾರವಾಗಿದೆ! ನಾನು ಅದನ್ನು ಉಲ್ಟು ಮಾಡಲಾಗುವುದಿಲ್ಲ. ಈ ಆಲೋಚನೆ ಕೆಲಸ ಮಾಡಲಿಲ್ಲ."
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "crow",
+      "display_order": 9,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "I don't see any other water nearby. Let me go back and think of another way.",
+        "hi": "मुझे पास में कोई और पानी नहीं दिख रहा है। चलो वापस जाकर दूसरा तरीका सोचते हैं।",
+        "kn": "ನನಗೆ ಹತ್ತಿರದಲ್ಲಿ ಬೇರೆ ನೀರು ಕಾಣಿಸುತ್ತಿಲ್ಲ. ಹಿಂತಿರುಗಿ ಬೇರೆ ಮಾರ್ಗವನ್ನು ಆಲೋಚಿಸೋಣ."
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "narrator",
+      "display_order": 10,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "The crow kept dropping stones one by one. After many stones, the water finally rose high enough.",
+        "hi": "कौआ एक-एक करके पत्थर डालता रहा। कई पत्थरों के बाद, पानी अंततः काफी ऊपर उठ गया।",
+        "kn": "ಕಾಗೆ ಒಂದೊಂದಾಗಿ ಕಲ್ಲುಗಳನ್ನು ಹಾಕುತ್ತಲೇ ಇತ್ತು. ಅನೇಕ ಕಲ್ಲುಗಳ ನಂತರ, ನೀರು ಅಂತಿಮವಾಗಿ ಸಾಕಷ್ಟು ಮೇಲಕ್ಕೆ ಏರಿತು."
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "crow",
+      "display_order": 11,
+      "is_start": false,
+      "is_end": false,
+      "text": {
+        "en": "The water has risen! I can finally drink! This was hard work, but my intelligence helped me!",
+        "hi": "पानी बढ़ गया है! मैं आखिरकार पी सकता हूं! यह कड़ी मेहनत थी, लेकिन मेरी बुद्धि ने मेरी मदद की!",
+        "kn": "ನೀರು ಏರಿದೆ! ನಾನು ಅಂತಿಮವಾಗಿ ಕುಡಿಯಬಹುದು! ಇದು ಕಠೋನ ಪರಿಶ್ರಮವಾಗಿತ್ತು, ಆದರೆ ನನ್ನ ಬುದ್ಧಿವಂತಿಕೆ ನನಗೆ ಸಹಾಯ ಮಾಡಿತು!"
+      }
+    },
+    {
+      "node_type": "narration",
+      "character_slug": "narrator",
+      "display_order": 12,
+      "is_start": false,
+      "is_end": true,
+      "text": {
+        "en": "And so, the clever crow quenched his thirst. Intelligence and persistence always help solve problems!",
+        "hi": "औस प्रकार, चालाक कौए ने अपनी प्यास बुझाई। बुद्धि और दृढ़ता हमेशा समस्याओं को हल करने में मदद करती है!",
+        "kn": "ಹೀಗಾಗಿ, ಚತುರ ಕಾಗೆ ತನ್ನ ದಾಹವನ್ನು ತಣಿಸಿಕೊಂಡಿತು. ಬುದ್ಧಿವಂತಿಕೆ ಮತ್ತು ದೃಢತೆ ಯಾವಾಗಲೂ ಸಮಸ್ಯೆಗಳನ್ನು ಪರಿಹರಿಸಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ!"
+      }
+    }
+  ]
+}
