@@ -7,29 +7,42 @@
 
 ---
 
-## 🚨 READ THIS FIRST: Conflict-Free Workflow
+## 🚨 READ THIS FIRST: 10-Hour Sprint Mode
 
-**To avoid merge conflicts and issues, follow this exactly:**
+> **This project is now a 10-HOUR SPRINT**  
+> **Read:** `10_HOUR_SPRINT.md` for complete hour-by-hour plan
 
-### Morning (Before You Start Working)
+### The Sprint Structure
+
+| Hours | Phase | Pink Panther | Jackie Chan |
+|-------|-------|--------------|-------------|
+| 1-2 | Foundation | Setup FastAPI + DB | Setup Next.js |
+| 3-4 | Core Build | API endpoints | UI components |
+| 5-6 | Integration | Audio service | Audio player |
+| 7-8 | Features | Generate all audio | Choices + PWA |
+| 9-10 | Ship | Deploy backend | Deploy frontend |
+
+### Quick Git (No Conflicts)
 ```bash
-git checkout develop && git pull
-git checkout feature/your-branch
-git rebase develop
-```
-
-### During Day (Every 30-60 minutes)
-```bash
+# Every 1-2 hours
 git add . && git commit -m "[PP] feat: what you did"
+git push origin feature/PP-sprint  # or feature/JC-sprint
+
+# To share with teammate
+git checkout develop
+git merge feature/PP-sprint
+git push origin develop
 ```
 
-### Evening (Before You Stop)
-```bash
-git push origin feature/your-branch
-# Create PR on GitHub, request review, DON'T merge yourself
-```
+### Sync Points (5 times in 10 hours)
+- Hour 2: API contracts
+- Hour 4: Integration test
+- Hour 6: Audio playback
+- Hour 8: Full story test
+- Hour 10: Production test
 
-**📖 Full details:** See `CONFLICT_FREE_WORKFLOW.md`
+**📖 Full workflow:** See `CONFLICT_FREE_WORKFLOW.md`  
+**📖 Hour plan:** See `10_HOUR_SPRINT.md`
 
 ---
 
@@ -136,56 +149,27 @@ git push origin feature/your-branch
 
 ---
 
-## 📋 Daily Tasks
+## 📋 10-Hour Sprint Tasks
 
-### **Day 1: Foundation (February 7)**
+### **Hour 1-2: Foundation (Setup)**
 
-#### Pink Panther Tasks
+| Time | Pink Panther | Jackie Chan | Status |
+|------|--------------|-------------|--------|
+| 0:00-0:30 | Initialize FastAPI, install deps | Initialize Next.js, Tailwind | ⬜ |
+| 0:30-1:00 | Create SQLAlchemy models | Setup shadcn/ui components | ⬜ |
+| 1:00-1:30 | Setup Alembic, run migrations | Install Zustand, TanStack Query, Howler | ⬜ |
+| 1:30-2:00 | Test Bulbul API connection | Create folder structure | ⬜ |
 
-| # | Task | Priority | Time | Status |
-|---|------|----------|------|--------|
-| A1.1 | Initialize FastAPI project structure | P0 | 30m | ⬜ |
-| A1.2 | Setup PostgreSQL connection with SQLAlchemy | P0 | 30m | ⬜ |
-| A1.3 | Create database models (User, Story, Character) | P0 | 45m | ⬜ |
-| A1.4 | Setup Alembic migrations | P0 | 15m | ⬜ |
-| A1.5 | **API CONTRACT DISCUSSION** with Jackie Chan | P0 | 30m | ⬜ |
-| A1.6 | Implement `POST /auth/anonymous` endpoint | P0 | 30m | ⬜ |
-| A1.7 | Implement `GET /stories` endpoint | P0 | 30m | ⬜ |
-| A1.8 | Create Bulbul API service module | P1 | 45m | ⬜ |
-| A1.9 | Test Bulbul API with sample text | P1 | 15m | ⬜ |
-| A1.10 | Write "The Clever Crow" story data (JSON) | P1 | 45m | ⬜ |
-
-#### Jackie Chan Tasks
-
-| # | Task | Priority | Time | Status |
-|---|------|----------|------|--------|
-| B1.1 | Initialize Next.js 15 project with TypeScript | P0 | 30m | ⬜ |
-| B1.2 | Setup Tailwind CSS configuration | P0 | 15m | ⬜ |
-| B1.3 | Initialize shadcn/ui | P0 | 15m | ⬜ |
-| B1.4 | Install dependencies (Zustand, TanStack Query, Howler.js) | P0 | 15m | ⬜ |
-| B1.5 | Create folder structure (app, components, hooks, store) | P0 | 15m | ⬜ |
-| B1.6 | **API CONTRACT DISCUSSION** with Pink Panther | P0 | 30m | ⬜ |
-| B1.7 | Setup Zustand stores (user, audio, story) | P0 | 30m | ⬜ |
-| B1.8 | Setup TanStack Query client | P0 | 15m | ⬜ |
-| B1.9 | Create LanguageSelector component | P0 | 30m | ⬜ |
-| B1.10 | Create StoryCard component | P0 | 30m | ⬜ |
-| B1.11 | Create basic layout (Navbar, Footer) | P0 | 30m | ⬜ |
-
-#### Day 1 Sync Point (2:00 PM)
-
-**Agenda (30 minutes):**
-1. Review API response formats together
-2. Agree on shared TypeScript types
-3. Define Story, Character, Node interfaces
-4. Confirm endpoint paths
+**🔄 SYNC (15 min):** Agree on API contracts, shared types
 
 **Deliverables:**
-- ✅ API contracts documented in `API_SPEC.md`
-- ✅ Shared types in `packages/shared/src/types/`
+- Backend runs on localhost:8000
+- Frontend runs on localhost:3000
+- Shared types agreed
 
 ---
 
-### **Day 2: Core Features (February 8)**
+### **Hour 3-4: Core Build**
 
 #### Pink Panther Tasks
 
@@ -198,136 +182,93 @@ git push origin feature/your-branch
 | A2.5 | Implement `GET /audio/{node_id}` endpoint | P0 | 45m | ⬜ |
 | A2.6 | Setup R2 storage integration | P0 | 30m | ⬜ |
 | A2.7 | Generate test audio for 1 story (Hindi) | P0 | 30m | ⬜ |
-| A2.8 | Write "The Kind Woodcutter" story (Bengali) | P1 | 30m | ⬜ |
-| A2.9 | Write "Tenali Raman" story (Tamil) | P1 | 30m | ⬜ |
+| Time | Pink Panther | Jackie Chan | Status |
+|------|--------------|-------------|--------|
+| 2:00-2:30 | `POST /auth/anonymous` | Setup API client, TanStack Query | ⬜ |
+| 2:30-3:00 | `GET /stories` endpoint | Create StoryCard component | ⬜ |
+| 3:00-3:30 | `GET /stories/{slug}` endpoint | Create StoryGrid, /stories page | ⬜ |
+| 3:30-4:00 | `POST /stories/{slug}/choices` | Create Zustand stores | ⬜ |
 
-#### Jackie Chan Tasks
-
-| # | Task | Priority | Time | Status |
-|---|------|----------|------|--------|
-| B2.1 | Build Story Gallery page (`/stories`) | P0 | 45m | ⬜ |
-| B2.2 | Build Story Detail page (`/stories/[slug]`) | P0 | 45m | ⬜ |
-| B2.3 | Create StoryGrid component | P0 | 30m | ⬜ |
-| B2.4 | Integrate TanStack Query for data fetching | P0 | 30m | ⬜ |
-| B2.5 | Build AudioPlayer component skeleton | P0 | 30m | ⬜ |
-| B2.6 | Integrate Howler.js for audio playback | P0 | 45m | ⬜ |
-| B2.7 | Implement play/pause/seek controls | P0 | 30m | ⬜ |
-| B2.8 | Add volume control | P1 | 15m | ⬜ |
-| B2.9 | Build Story Player page (`/play/[storyId]`) | P0 | 45m | ⬜ |
-
-#### Day 2 Sync Point (4:00 PM)
-
-**Agenda (1 hour):**
-1. Test API integration together
-2. Verify audio playback works end-to-end
-3. Debug any CORS/audio issues
-4. Adjust timelines if needed
+**🔄 SYNC (15 min):** Test API integration, fix CORS
 
 **Deliverables:**
-- ✅ One complete story playable from start to finish
-- ✅ Audio plays correctly in browser
+- API endpoints respond correctly
+- Frontend displays stories
+- CORS configured
 
 ---
 
-### **Day 3: Integration & Polish (February 9)**
+### **Hour 5-6: Integration (Audio)**
 
-#### Pink Panther Tasks
+| Time | Pink Panther | Jackie Chan | Status |
+|------|--------------|-------------|--------|
+| 4:00-4:30 | `GET /audio/{node_id}` endpoint | Create AudioPlayer component | ⬜ |
+| 4:30-5:00 | Setup Redis caching | Implement Howler.js integration | ⬜ |
+| 5:00-5:30 | Audio generation pipeline | Create /play/[storyId] page | ⬜ |
+| 5:30-6:00 | Generate 1 story audio (Hindi) | Connect player to API | ⬜ |
 
-| # | Task | Priority | Time | Status |
-|---|------|----------|------|--------|
-| A3.1 | Implement progress tracking API | P0 | 45m | ⬜ |
-| A3.2 | Create `GET /users/progress` endpoint | P0 | 30m | ⬜ |
-| A3.3 | Create `POST /users/progress` endpoint | P0 | 30m | ⬜ |
-| A3.4 | Setup Upstash Redis connection | P0 | 30m | ⬜ |
-| A3.5 | Implement audio metadata caching | P0 | 30m | ⬜ |
-| A3.6 | Bulk generate audio for all stories | P0 | 2h | ⬜ |
-| A3.7 | Upload all audio files to R2 | P0 | 30m | ⬜ |
-| A3.8 | Create analytics events endpoint | P1 | 30m | ⬜ |
-| A3.9 | Setup Sentry error tracking (backend) | P1 | 15m | ⬜ |
-
-#### Jackie Chan Tasks
-
-| # | Task | Priority | Time | Status |
-|---|------|----------|------|--------|
-| B3.1 | Create ChoiceOverlay component | P0 | 45m | ⬜ |
-| B3.2 | Create ChoiceButton component | P0 | 30m | ⬜ |
-| B3.3 | Implement choice selection flow | P0 | 45m | ⬜ |
-| B3.4 | Build progress state management | P0 | 30m | ⬜ |
-| B3.5 | Implement language switcher | P0 | 30m | ⬜ |
-| B3.6 | Add code-mixing slider | P0 | 30m | ⬜ |
-| B3.7 | Create PWA manifest | P0 | 15m | ⬜ |
-| B3.8 | Add service worker for offline support | P0 | 45m | ⬜ |
-| B3.9 | Mobile responsiveness pass | P0 | 45m | ⬜ |
-| B3.10 | Add loading states and error boundaries | P1 | 30m | ⬜ |
-| B3.11 | Setup Sentry error tracking (frontend) | P1 | 15m | ⬜ |
-
-#### Day 3 Sync Point (6:00 PM)
-
-**Agenda (1 hour):**
-1. Full end-to-end testing
-2. Test all choice branches
-3. Test language switching
-4. Test offline mode
-5. Bug fix session
+**🔄 SYNC (20 min):** Audio MUST play end-to-end
 
 **Deliverables:**
-- ✅ All 3 stories playable
-- ✅ All languages working
-- ✅ PWA installable
-- ✅ Offline mode functional
+- Audio endpoint works
+- Player displays and plays
+- No console errors
 
 ---
 
-### **Day 4: Deployment & Demo Prep (February 10)**
+### **Hour 7-8: Features (Stories + Choices)**
 
-#### Pink Panther Tasks
+| Time | Pink Panther | Jackie Chan | Status |
+|------|--------------|-------------|--------|
+| 6:00-6:45 | Write 3 stories (JSON) | Create ChoiceOverlay component | ⬜ |
+| 6:45-7:30 | Bulk generate all audio | Implement choice navigation | ⬜ |
+| 7:30-8:00 | Progress endpoints | LanguageSelector + code-mix slider | ⬜ |
 
-| # | Task | Priority | Time | Status |
-|---|------|----------|------|--------|
-| A4.1 | Deploy backend to Railway | P0 | 30m | ⬜ |
-| A4.2 | Configure production environment variables | P0 | 15m | ⬜ |
-| A4.3 | Setup Railway database | P0 | 15m | ⬜ |
-| A4.4 | Run migrations on production DB | P0 | 10m | ⬜ |
-| A4.5 | Seed production database | P0 | 10m | ⬜ |
-| A4.6 | Load testing with locust | P1 | 30m | ⬜ |
-| A4.7 | API documentation review | P1 | 15m | ⬜ |
+**🔄 SYNC (20 min):** Full story test, all choices work
 
-#### Jackie Chan Tasks
-
-| # | Task | Priority | Time | Status |
-|---|------|----------|------|--------|
-| B4.1 | Deploy frontend to Vercel | P0 | 15m | ⬜ |
-| B4.2 | Configure production API URL | P0 | 10m | ⬜ |
-| B4.3 | Cross-browser testing | P0 | 30m | ⬜ |
-| B4.4 | Mobile device testing | P0 | 30m | ⬜ |
-| B4.5 | Performance optimization | P1 | 30m | ⬜ |
-| B4.6 | SEO meta tags | P1 | 15m | ⬜ |
-| B4.7 | Favicon and icons | P1 | 15m | ⬜ |
-
-#### Joint Tasks
-
-| # | Task | Priority | Time | Status |
-|---|------|----------|------|--------|
-| J4.1 | Write demo script | P0 | 30m | ⬜ |
-| J4.2 | Practice demo (5+ times) | P0 | 1h | ⬜ |
-| J4.3 | End-to-end testing | P0 | 1h | ⬜ |
-| J4.4 | Record backup demo video | P1 | 30m | ⬜ |
-| J4.5 | Update README.md | P1 | 30m | ⬜ |
-| J4.6 | Final bug fixes | P0 | 1h | ⬜ |
+**Deliverables:**
+- 3 stories in database
+- Choices display and navigate
+- All audio generated
 
 ---
 
-### **Day 5: Submission Day (February 11)**
+### **Hour 9-10: Ship (Deploy)**
 
-| # | Task | Owner | Status |
-|---|------|-------|--------|
-| S1 | Final demo run-through | Both | ⬜ |
-| S2 | Deploy any last fixes | A/B as needed | ⬜ |
-| S3 | Push final code to GitHub | Both | ⬜ |
-| S4 | Create release tag | Pink Panther or Jackie Chan | ⬜ |
-| S5 | Submit project | Both | ⬜ |
-| S6 | Post on social media (#TheMicIsYours) | Both | ⬜ |
-| S7 | Email confirmation | Both | ⬜ |
+| Time | Pink Panther | Jackie Chan | Status |
+|------|--------------|-------------|--------|
+| 8:00-8:30 | Upload audio to R2 | Add PWA manifest + service worker | ⬜ |
+| 8:30-9:00 | Deploy to Railway | Mobile responsive pass | ⬜ |
+| 9:00-9:30 | Test production API | Deploy to Vercel | ⬜ |
+| 9:30-10:00 | Final backend tests | Test production, final fixes | ⬜ |
+
+**🎯 FINAL TEST (Both):**
+- [ ] Production URL works on phone
+- [ ] PWA installs
+- [ ] Story plays end-to-end
+- [ ] Choices work
+- [ ] Offline mode works
+
+---
+
+## ⚡ Sprint Tips
+
+### Communication During Sprint
+- **Keep voice/video call open** entire 10 hours
+- **Quick questions:** < 2 min response
+- **Blockers:** Immediate help
+- **Sync points:** Non-negotiable, stop work and sync
+
+### If Falling Behind
+- Skip non-essential: analytics, Sentry, tests
+- Focus on 1 perfect story vs 3 mediocre
+- Deploy early, test continuously
+
+### Quality Gates (Must Pass)
+- Audio plays < 1 second
+- No console errors
+- Mobile responsive
+- Deployed and working
 
 ---
 
@@ -423,30 +364,35 @@ Both: Sync on any API changes needed
 
 ## 🧪 Testing Checklist
 
-### Before Each PR
+### Before Each Commit (during sprint)
 
 - [ ] Code runs without errors
 - [ ] No console warnings
 - [ ] Mobile responsive (if UI)
 - [ ] API returns expected format (if backend)
 
-### Day 3 Integration Test
+### Hour 6 Test (Audio Integration)
 
 - [ ] Story loads from API
-- [ ] Audio plays within 500ms
+- [ ] Audio plays within 1 second
+- [ ] Player controls work
+- [ ] No console errors
+
+### Hour 8 Test (Full Features)
+
+- [ ] All 3 stories playable
 - [ ] Choices display correctly
 - [ ] Branch navigation works
-- [ ] Progress saves correctly
 - [ ] Language switching works
 - [ ] Offline mode works (PWA)
 
-### Day 4 Final Test
+### Hour 10 Final Test
 
-- [ ] All 3 stories playable
+- [ ] Production URL live
 - [ ] All languages working (Hi, Ta, Bn)
-- [ ] All code-mix ratios working
 - [ ] Mobile experience smooth
-- [ ] Production deployment live
+- [ ] PWA installable
+- [ ] Demo ready
 
 ---
 
@@ -454,18 +400,18 @@ Both: Sync on any API changes needed
 
 | Risk | Mitigation | Owner |
 |------|-----------|-------|
-| Bulbul API down | Pre-generate all audio by Day 3 | A |
-| Deployment failure | Test deploy on Day 3 evening | Pink Panther & Jackie Chan |
-| API contract mismatch | Daily sync + shared types | Both |
-| Merge conflicts | Clear file ownership rules | Both |
-| Feature creep | Strict MVP scope enforcement | Both |
-| Demo failure | Record backup video | B |
+| Bulbul API down | Pre-generate all audio by Hour 7 | Pink Panther |
+| Deployment failure | Deploy by Hour 9, test early | Pink Panther & Jackie Chan |
+| API contract mismatch | Sync at Hour 2 + shared types | Both |
+| Merge conflicts | Clear file ownership + frequent commits | Both |
+| Feature creep | Strict MVP scope, skip non-essential | Both |
+| Demo failure | Test continuously, fix early | Both |
 
 ---
 
 ## ✅ Pre-Start Checklist
 
-Before starting Day 1, ensure:
+Before starting the 10-hour sprint, ensure:
 
 - [ ] Both have GitHub access to repo
 - [ ] Both have same Node.js (18+) installed
@@ -473,7 +419,7 @@ Before starting Day 1, ensure:
 - [ ] Agreed on code formatter (Prettier/Black)
 - [ ] Pre-commit hooks installed
 - [ ] Branch protection rules configured
-- [ ] Daily standup time scheduled
+- [ ] 10-hour block cleared (no interruptions)
 - [ ] Communication channels setup (Slack/Discord)
 - [ ] Both have access to:
   - [ ] Railway account

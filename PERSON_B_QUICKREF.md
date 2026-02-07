@@ -1,190 +1,276 @@
 # Jackie Chan - Frontend Lead Quick Reference
 
-## 🎯 Today's Priority
-Check `TEAM_COLLABORATION.md` for detailed daily tasks.
+## 🎯 10-Hour Sprint Mode
+
+**Goal:** Complete frontend in 10 hours  
+**Focus:** Speed + Quality  
+**Read:** `10_HOUR_SPRINT.md` for full timeline
+
+---
+
+## ⚡ Hour-by-Hour Checklist
+
+### Hour 1-2: Foundation
+```bash
+# Next.js setup (30 min)
+cd apps/web
+npx create-next-app@latest . --typescript --tailwind --app
+
+# shadcn/ui (30 min)
+npx shadcn@latest init
+npx shadcn add button card slider avatar badge dialog
+
+# Dependencies (30 min)
+npm install zustand @tanstack/react-query howler axios
+npm install -D @types/howler
+
+# Structure (30 min)
+# Create folders: components/, hooks/, store/, queries/
+```
+
+### Hour 3-4: Core UI
+```bash
+# API client (30 min)
+# - Setup axios
+# - TanStack Query provider
+
+# Components (90 min)
+# - StoryCard.tsx
+# - StoryGrid.tsx
+# - /stories page
+
+# State (30 min)
+# - userStore.ts
+# - storyStore.ts
+# - audioStore.ts
+```
+
+### Hour 5-6: Audio Player
+```bash
+# Howler integration (60 min)
+# - useAudio.ts hook
+# - AudioPlayer.tsx component
+
+# Player page (60 min)
+# - /play/[storyId]/page.tsx
+# - Connect to API
+# - Test audio playback
+```
+
+### Hour 7-8: Choices + Polish
+```bash
+# Choice UI (90 min)
+# - ChoiceOverlay.tsx
+# - ChoiceButton.tsx
+# - Branch navigation
+
+# Language + PWA (30 min)
+# - LanguageSelector.tsx
+# - CodeMixSlider.tsx
+# - PWA manifest
+```
+
+### Hour 9-10: Mobile + Deploy
+```bash
+# Mobile (60 min)
+# - Responsive design
+# - Touch controls
+
+# Deploy (90 min)
+vercel --prod
+# Update API URL
+# Test production
+```
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-# 1. Clone and setup
+# Clone and setup
 git clone <repo-url>
 cd bhasha-kahani
+git checkout -b feature/JC-sprint
 
-# 2. Create your feature branch
-git checkout develop
-git pull origin develop
-git checkout -b feature/B-nextjs-setup
-
-# 3. Setup frontend
+# Setup frontend
 cd apps/web
 npm install
-
-# 4. Copy env and configure
 cp .env.example .env.local
 # Edit .env.local
 
-# 5. Start dev server
+# Start
 npm run dev
-# App at http://localhost:3000
+# Open http://localhost:3000
 ```
 
 ---
 
-## 📁 You Own These Files
-
-```
-apps/web/
-├── app/
-│   ├── (main)/
-│   │   ├── page.tsx
-│   │   ├── stories/
-│   │   ├── play/[storyId]/
-│   │   └── layout.tsx
-│   ├── layout.tsx
-│   └── manifest.ts
-├── components/
-│   ├── ui/              # shadcn components
-│   ├── story/
-│   ├── audio/
-│   ├── choice/
-│   ├── language/
-│   └── layout/
-├── hooks/
-│   ├── useAudio.ts
-│   ├── useStory.ts
-│   └── useProgress.ts
-├── store/
-│   ├── userStore.ts
-│   ├── storyStore.ts
-│   └── audioStore.ts
-├── queries/
-│   ├── stories.ts
-│   └── keys.ts
-├── lib/
-│   ├── api.ts
-│   └── utils.ts
-├── types/
-│   └── *.ts
-└── public/
-    ├── sw.js
-    └── manifest.json
-
-packages/shared/ (coordinate with A)
-```
-
----
-
-## 🔑 Key Environment Variables
+## 🔑 Environment Variables (.env.local)
 
 ```env
-# API
 NEXT_PUBLIC_API_URL=http://localhost:8000
 
-# Feature flags
 NEXT_PUBLIC_ENABLE_ANALYTICS=false
 NEXT_PUBLIC_ENABLE_OFFLINE=true
 
-# Sentry (optional for local)
 NEXT_PUBLIC_SENTRY_DSN=
+```
+
+**Production:**
+```env
+NEXT_PUBLIC_API_URL=https://your-railway-app.up.railway.app
 ```
 
 ---
 
-## 📝 Daily Checklist
+## 📝 Git Commands (10-Hour Sprint)
 
-### Morning
-- [ ] `git checkout develop && git pull`
-- [ ] `git checkout feature/your-branch`
-- [ ] `git rebase develop`
-- [ ] Review Pink Panther's overnight PRs
+```bash
+# Every 1-2 hours
+git add .
+git commit -m "[JC] feat: what you built"
 
-### During Day
-- [ ] Commit every 30-60 minutes
-- [ ] Use format: `[JC] feat: description`
-- [ ] Test UI in mobile view (F12 → toggle device)
+# At sync points
+git push origin feature/JC-sprint
 
-### Evening
-- [ ] Push branch: `git push origin feature/your-branch`
-- [ ] Create PR to `develop`
-- [ ] Tag Pink Panther for review
-- [ ] Update task status in TEAM_COLLABORATION.md
+# Pink needs your changes?
+git checkout develop
+git merge feature/JC-sprint
+git push origin develop
+```
 
 ---
 
-## 🧪 Testing Your Components
+## 🎨 Key Components
+
+### StoryCard.tsx
+```tsx
+'use client';
+import { Card, CardContent } from '@/components/ui/card';
+
+export function StoryCard({ story }) {
+  return (
+    <Card className="hover:shadow-lg transition-shadow">
+      <img src={story.coverImage} alt={story.title} />
+      <CardContent>
+        <h3>{story.title}</h3>
+        <p>{story.description}</p>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### AudioPlayer.tsx
+```tsx
+'use client';
+import { useAudio } from '@/hooks/useAudio';
+
+export function AudioPlayer({ audioUrl }) {
+  const { isPlaying, togglePlay, progress } = useAudio(audioUrl);
+  
+  return (
+    <div>
+      <button onClick={togglePlay}>
+        {isPlaying ? 'Pause' : 'Play'}
+      </button>
+      <progress value={progress} max={100} />
+    </div>
+  );
+}
+```
+
+---
+
+## 🧪 Quick Tests
 
 ```bash
 # Build check
 npm run build
 
 # Type check
-npm run type-check
-
-# Lint check
-npm run lint
-```
-
----
-
-## 🎨 shadcn/ui Commands
-
-```bash
-# Add new component
-npx shadcn add button
-npx shadcn add card
-npx shadcn add slider
-npx shadcn add dialog
-
-# See all available
-npx shadcn add --help
-```
-
----
-
-## 🆘 Emergency Contacts
-
-- **Blocked by API question?** → Ping Pink Panther
-- **Audio not playing?** → Check Howler.js docs
-- **Build failing?** → Check TypeScript errors
-- **Can't deploy?** → Check Vercel dashboard
-
----
-
-## 📚 Useful Commands
-
-```bash
-# Dev server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production build
-npm start
+npx tsc --noEmit
 
 # Lint
 npm run lint
-
-# Type check
-npx tsc --noEmit
-
-# Deploy to Vercel
-vercel --prod
 ```
 
 ---
 
-## 📱 PWA Testing
+## 🆘 Emergency Help
 
-1. Open Chrome DevTools (F12)
-2. Go to Application → Manifest
-3. Check icons, theme color
-4. Go to Service Workers
-5. Check "Offline" checkbox
-6. Reload page - should still work
+| Issue | Fix |
+|-------|-----|
+| API not connecting | Check NEXT_PUBLIC_API_URL, CORS |
+| Audio not playing | Check Howler.js setup, audio URL |
+| Build failing | Check TypeScript errors |
+| Hydration error | Add 'use client' directive |
+| Deploy failing | Check Vercel logs |
 
 ---
 
-**Full details in TEAM_COLLABORATION.md**
+## 📱 PWA Quick Setup
+
+```typescript
+// app/manifest.ts
+export default function manifest() {
+  return {
+    name: 'Bhasha Kahani',
+    short_name: 'BhashaKahani',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#fff',
+    theme_color: '#f97316',
+  };
+}
+```
+
+```javascript
+// public/sw.js
+const CACHE_NAME = 'bhasha-v1';
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE_NAME));
+});
+```
+
+---
+
+## 🎵 Howler.js Pattern
+
+```typescript
+// hooks/useAudio.ts
+import { useEffect, useRef } from 'react';
+import { Howl } from 'howler';
+
+export function useAudio(url: string) {
+  const soundRef = useRef<Howl | null>(null);
+  
+  useEffect(() => {
+    soundRef.current = new Howl({
+      src: [url],
+      html5: true,
+    });
+    
+    return () => soundRef.current?.unload();
+  }, [url]);
+  
+  const play = () => soundRef.current?.play();
+  const pause = () => soundRef.current?.pause();
+  
+  return { play, pause };
+}
+```
+
+---
+
+## ✅ Success Checklist
+
+- [ ] Story gallery displays
+- [ ] Audio plays correctly
+- [ ] Choices work
+- [ ] Language switching works
+- [ ] Mobile responsive
+- [ ] PWA installable
+- [ ] Deployed to Vercel
+
+**Full details in 10_HOUR_SPRINT.md**
