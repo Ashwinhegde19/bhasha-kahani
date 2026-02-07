@@ -1,0 +1,11 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "bash apps/api/start.sh"
+healthcheckPath = "/health"
+restartPolicyType = "on_failure"
+
+[env]
+PYTHON_VERSION = "3.12.0"
+PORT = "8000"
