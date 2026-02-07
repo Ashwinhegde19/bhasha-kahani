@@ -1,52 +1,49 @@
 """
-Cloudflare R2 Storage Service
-R2 is S3-compatible object storage
+Supabase Storage Service for Audio Files
+Free tier: 1GB storage, 2GB bandwidth
+No credit card required!
 """
 
-import boto3
-from botocore.config import Config
+import httpx
 from typing import Optional
 from app.config import get_settings
 
 settings = get_settings()
 
 
-class R2Service:
+class StorageService:
+    """Supabase Storage service for audio files"""
+
     def __init__(self):
-        self.bucket_name = settings.r2_bucket_name
-        self.public_url = settings.r2_public_url
-        self.account_id = settings.r2_account_id
-        self.access_key_id = settings.r2_access_key_id
-        self.secret_access_key = settings.r2_secret_access_key
-        self._s3_client = None
+        self.supabase_url = None
+        self.supabase_key = getattr(settings, "supabase_service_key", None) or getattr(
+            settings, "supabase_key", None
+        )
+        self.bucket_name = "audio-files"
+        self._storage_url = None
+
+        # Extract Supabase URL from database URL
+        if hasattr(settings, "database_url") and settings.database_url:
+            try:
+                # Parse: postgresql://user:pass@db.xxxxx.supabase.co:5432/dbname
+                host = settings.database_url.split("@")[1].split(":")[0]
+                if "supabase.co" in host:
+                    # Extract project ref: db.xxxxx -> xxxxx
+                    project_ref = host.replace("db.", "").replace(".supabase.co", "")
+                    self.supabase_url = f"https://{project_ref}.supabase.co"
+            except:
+                pass
 
     @property
-    def s3_client(self):
-        """Lazy load S3 client only when needed"""
-        if self._s3_client is None:
-            # Check if R2 is configured
-            if not all(
-                [
-                    self.account_id,
-                    self.access_key_id,
-                    self.secret_access_key,
-                    self.bucket_name,
-                ]
-            ):
-                raise ValueError(
-                    "R2 credentials not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME"
-                )
+    def storage_url(self) -> Optional[str]:
+        """Get Supabase storage URL"""
+        if self._storage_url is None and self.supabase_url:
+            self._storage_url = f"{self.supabase_url}/storage/v1"
+        return self._storage_url
 
-            # R2 is S3-compatible
-            self._s3_client = boto3.client(
-                service_name="s3",
-                endpoint_url=f"https://{self.account_id}.r2.cloudflarestorage.com",
-                aws_access_key_id=self.access_key_id,
-                aws_secret_access_key=self.secret_access_key,
-                config=Config(signature_version="s3v4"),
-                region_name="auto",  # R2 uses 'auto' region
-            )
-        return self._s3_client
+    def is_configured(self) -> bool:
+        """Check if Supabase storage is configured"""
+        return all([self.storage_url, self.supabase_key])
 
     async def upload_audio(
         self,
@@ -57,7 +54,7 @@ class R2Service:
         speaker: str,
     ) -> Optional[str]:
         """
-        Upload audio file to R2 and return public URL
+        Upload audio file to Supabase Storage and return public URL
 
         Args:
             audio_bytes: Raw audio file bytes
@@ -69,65 +66,69 @@ class R2Service:
         Returns:
             Public URL of uploaded file or None if failed
         """
-        # Check if R2 is configured
-        if not all(
-            [
-                self.account_id,
-                self.access_key_id,
-                self.secret_access_key,
-                self.bucket_name,
-            ]
-        ):
-            print("⚠️  R2 not configured - returning placeholder URL")
-            return None
-
-        try:
-            # Create key: stories/{slug}/audio/{language}/{speaker}/{node_id}.mp3
-            file_key = f"stories/{story_slug}/audio/{language}/{speaker}/{node_id}.mp3"
-
-            # Upload to R2
-            self.s3_client.put_object(
-                Bucket=self.bucket_name,
-                Key=file_key,
-                Body=audio_bytes,
-                ContentType="audio/mpeg",
-                Metadata={
-                    "language": language,
-                    "speaker": speaker,
-                    "node-id": str(node_id),
-                },
+        if not self.is_configured():
+            print("⚠️  Supabase storage not configured - returning placeholder URL")
+            print(
+                "   To enable: Get your service key from Supabase Dashboard > Project Settings > API"
             )
-
-            # Return public URL
-            if self.public_url:
-                return f"{self.public_url}/{file_key}"
-            else:
-                # Construct URL from endpoint
-                return f"https://{self.account_id}.r2.cloudflarestorage.com/{self.bucket_name}/{file_key}"
-
-        except Exception as e:
-            print(f"R2 upload error: {e}")
             return None
 
-    async def delete_audio(self, file_key: str) -> bool:
-        """Delete audio file from R2"""
         try:
-            self.s3_client.delete_object(Bucket=self.bucket_name, Key=file_key)
-            return True
+            # Create file path: stories/{slug}/audio/{language}/{speaker}/{node_id}.mp3
+            file_path = f"stories/{story_slug}/audio/{language}/{speaker}/{node_id}.mp3"
+
+            # Upload via Supabase Storage API
+            upload_url = f"{self.storage_url}/object/{self.bucket_name}/{file_path}"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    upload_url,
+                    headers={
+                        "Authorization": f"Bearer {self.supabase_key}",
+                        "Content-Type": "audio/mpeg",
+                        "x-upsert": "true",  # Overwrite if exists
+                    },
+                    content=audio_bytes,
+                    timeout=30.0,
+                )
+
+                if response.status_code in [200, 201]:
+                    # Return public URL
+                    public_url = f"{self.storage_url}/object/public/{self.bucket_name}/{file_path}"
+                    print(f"✅ Uploaded to Supabase: {public_url}")
+                    return public_url
+                else:
+                    print(f"❌ Upload failed: {response.status_code}")
+                    print(f"Response: {response.text}")
+                    return None
+
         except Exception as e:
-            print(f"R2 delete error: {e}")
+            print(f"❌ Storage upload error: {e}")
+            return None
+
+    async def delete_audio(self, file_path: str) -> bool:
+        """Delete audio file from storage"""
+        if not self.is_configured():
             return False
 
-    async def check_file_exists(self, file_key: str) -> bool:
-        """Check if file exists in R2 bucket"""
         try:
-            self.s3_client.head_object(Bucket=self.bucket_name, Key=file_key)
-            return True
-        except Exception:
+            delete_url = f"{self.storage_url}/object/{self.bucket_name}/{file_path}"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.delete(
+                    delete_url,
+                    headers={"Authorization": f"Bearer {self.supabase_key}"},
+                    timeout=10.0,
+                )
+                return response.status_code in [200, 204]
+
+        except Exception as e:
+            print(f"Storage delete error: {e}")
             return False
 
-    def generate_file_key(
-        self, story_slug: str, node_id: str, language: str, speaker: str
-    ) -> str:
-        """Generate the S3/R2 key for an audio file"""
-        return f"stories/{story_slug}/audio/{language}/{speaker}/{node_id}.mp3"
+
+# Keep R2Service for backward compatibility
+class R2Service(StorageService):
+    """Alias for StorageService (backward compatibility)"""
+
+    pass
