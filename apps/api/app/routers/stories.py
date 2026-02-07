@@ -49,7 +49,7 @@ async def list_stories(
             duration_min=story.duration_min or 0,
             cover_image=story.cover_image or "",
             character_count=0,  # TODO: Fix async relationship loading
-            choice_count=0,  # Calculate if needed
+            choice_count=0,
             is_completed_translation=translation.is_complete,
             created_at=story.created_at
         ))
@@ -102,9 +102,14 @@ async def get_story(
         )
         translation = result.scalar_one_or_none()
     
-    # Get characters
+    # Get characters directly
+    result = await db.execute(
+        select(Character).where(Character.story_id == story.id)
+    )
+    char_rows = result.scalars().all()
+    
     characters = []
-    for char in story.characters:
+    for char in char_rows:
         characters.append(CharacterResponse(
             id=char.id,
             slug=char.slug,
@@ -114,11 +119,16 @@ async def get_story(
             avatar_url=char.avatar_url
         ))
     
-    # Get nodes with choices
+    # Get nodes directly
+    result = await db.execute(
+        select(StoryNode).where(StoryNode.story_id == story.id)
+    )
+    node_rows = result.scalars().all()
+    
     nodes = []
     start_node_id = None
     
-    for node in sorted(story.nodes, key=lambda x: x.display_order):
+    for node in sorted(node_rows, key=lambda x: x.display_order):
         if node.is_start:
             start_node_id = node.id
         
@@ -126,23 +136,24 @@ async def get_story(
         text_content = node.text_content.get(language, 
             node.text_content.get("en", ""))
         
-        # Get character
+        # Get character for this node
         character = None
-        if node.character:
-            character = CharacterResponse(
-                id=node.character.id,
-                slug=node.character.slug,
-                name=node.character.name,
-                voice_profile=node.character.voice_profile,
-                bulbul_speaker=node.character.bulbul_speaker,
-                avatar_url=node.character.avatar_url
-            )
+        if node.character_id:
+            for char in characters:
+                if str(char.id) == str(node.character_id):
+                    character = char
+                    break
         
-        # Get choices
+        # Get choices for this node directly
+        result = await db.execute(
+            select(StoryChoice).where(StoryChoice.node_id == node.id)
+        )
+        choice_rows = result.scalars().all()
+        
         choices = None
-        if node.node_type == "choice" and node.choices:
+        if node.node_type == "choice" and choice_rows:
             choices = []
-            for choice in node.choices:
+            for choice in choice_rows:
                 choice_text = choice.text_content.get(language,
                     choice.text_content.get("en", ""))
                 choices.append(ChoiceResponse(
