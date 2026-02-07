@@ -7,6 +7,32 @@
 
 ---
 
+## 🚨 READ THIS FIRST: Conflict-Free Workflow
+
+**To avoid merge conflicts and issues, follow this exactly:**
+
+### Morning (Before You Start Working)
+```bash
+git checkout develop && git pull
+git checkout feature/your-branch
+git rebase develop
+```
+
+### During Day (Every 30-60 minutes)
+```bash
+git add . && git commit -m "[PP] feat: what you did"
+```
+
+### Evening (Before You Stop)
+```bash
+git push origin feature/your-branch
+# Create PR on GitHub, request review, DON'T merge yourself
+```
+
+**📖 Full details:** See `CONFLICT_FREE_WORKFLOW.md`
+
+---
+
 ## 👥 Team Roles
 
 ### **Pink Panther - Backend Lead** 
@@ -45,14 +71,29 @@ main (production - protected, requires PR)
   │
   └── develop (integration - protected, requires PR)
         │
-        ├── feature/A-api-setup      # Pink Panther's branches
-        ├── feature/A-db-models
-        ├── feature/A-bulbul-int
+        ├── feature/PP-api-setup           # Pink Panther's branches
+        ├── feature/PP-db-models
+        ├── feature/PP-bulbul-int
+        ├── feature/PP-day2-audio
+        ├── feature/PP-day3-cache
         │
-        ├── feature/B-nextjs-setup   # Jackie Chan's branches
-        ├── feature/B-ui-components
-        └── feature/B-audio-player
+        ├── feature/JC-nextjs-setup        # Jackie Chan's branches
+        ├── feature/JC-ui-components
+        ├── feature/JC-audio-player
+        ├── feature/JC-day2-storyplayer
+        ├── feature/JC-day3-choices
 ```
+
+### Naming Convention
+
+- **Pink Panther:** `feature/PP-<day>-<description>`
+- **Jackie Chan:** `feature/JC-<day>-<description>`
+
+**Examples:**
+- `feature/PP-day1-models`
+- `feature/JC-day1-setup`
+- `feature/PP-day2-bulbul`
+- `feature/JC-day2-player`
 
 ### Daily Git Workflow
 
