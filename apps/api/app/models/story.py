@@ -34,7 +34,7 @@ class StoryTranslation(Base):
     language_code = Column(String(10), nullable=False)
     title = Column(String(200), nullable=False)
     description = Column(Text)
-    content_json = Column(JSON, nullable=False)
+    content_json = Column(JSON, nullable=False, default=dict)
     is_complete = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -74,8 +74,8 @@ class StoryNode(Base):
     display_order = Column(Integer, nullable=False)
     is_start = Column(Boolean, default=False)
     is_end = Column(Boolean, default=False)
-    text_content = Column(JSON, nullable=False)  # {"en": "...", "hi": "...", "kn": "..."}
-    metadata = Column(JSON, default=dict)
+    text_content = Column(JSON, nullable=False, default=dict)  # {"en": "...", "hi": "...", "kn": "..."}
+    node_metadata = Column(JSON, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     story = relationship("Story", back_populates="nodes")
@@ -89,10 +89,10 @@ class StoryChoice(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     node_id = Column(UUID(as_uuid=True), ForeignKey("story_nodes.id", ondelete="CASCADE"), nullable=False)
     choice_key = Column(String(10), nullable=False)  # A, B, C
-    text_content = Column(JSON, nullable=False)  # {"en": "...", "hi": "...", "kn": "..."}
+    text_content = Column(JSON, nullable=False, default=dict)  # {"en": "...", "hi": "...", "kn": "..."}
     next_node_id = Column(UUID(as_uuid=True), ForeignKey("story_nodes.id", ondelete="SET NULL"))
     is_default = Column(Boolean, default=False)
-    metadata = Column(JSON, default=dict)
+    node_metadata = Column(JSON, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     __table_args__ = (

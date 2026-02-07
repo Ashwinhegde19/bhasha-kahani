@@ -14,4 +14,4 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_active = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     preferences = Column(JSON, default=dict)
-    metadata = Column(JSON, default=dict)
+    user_metadata = Column(JSON, default=dict)
