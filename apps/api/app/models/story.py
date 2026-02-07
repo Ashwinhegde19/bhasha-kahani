@@ -80,7 +80,7 @@ class StoryNode(Base):
     
     story = relationship("Story", back_populates="nodes")
     character = relationship("Character", back_populates="nodes")
-    choices = relationship("StoryChoice", back_populates="node", cascade="all, delete-orphan")
+    choices = relationship("StoryChoice", back_populates="node", foreign_keys="StoryChoice.node_id", cascade="all, delete-orphan")
 
 
 class StoryChoice(Base):
