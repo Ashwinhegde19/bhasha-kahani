@@ -48,7 +48,7 @@ async def list_stories(
             moral=story.moral,
             duration_min=story.duration_min or 0,
             cover_image=story.cover_image or "",
-            character_count=len(story.characters),
+            character_count=0,  # TODO: Fix async relationship loading
             choice_count=0,  # Calculate if needed
             is_completed_translation=translation.is_complete,
             created_at=story.created_at
