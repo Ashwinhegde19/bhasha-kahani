@@ -15,6 +15,7 @@ export interface UserPreferences {
 
 export interface TokenResponse {
   access_token: string;
+  token_type: string;
   expires_in: number;
   user_id: string;
 }
@@ -49,8 +50,9 @@ export interface ProgressSummary {
 }
 
 export interface ProgressUpdateRequest {
+  user_id: string;
   story_id: string;
-  current_node_id?: string;
+  current_node_id: string;
   is_completed?: boolean;
   time_spent_sec?: number;
 }

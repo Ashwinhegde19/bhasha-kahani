@@ -88,11 +88,11 @@ function StoryCardSkeleton() {
 }
 
 export default function StoriesPage() {
-  const [ageRange, setAgeRange] = useState<string>('');
+  const [ageRange, setAgeRange] = useState<string>('all');
   
   const { data: storiesData, isLoading } = useQuery({
     queryKey: ['stories', { age_range: ageRange }],
-    queryFn: () => api.listStories({ age_range: ageRange || undefined }),
+    queryFn: () => api.listStories({ age_range: ageRange === 'all' ? undefined : ageRange }),
   });
 
   const stories = storiesData?.data || [];
@@ -122,7 +122,7 @@ export default function StoriesPage() {
               <SelectValue placeholder="All Ages" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Ages</SelectItem>
+              <SelectItem value="all">All Ages</SelectItem>
               {AGE_RANGES.map((range) => (
                 <SelectItem key={range.value} value={range.value}>
                   {range.label}
@@ -131,8 +131,8 @@ export default function StoriesPage() {
             </SelectContent>
           </Select>
 
-          {ageRange && (
-            <Button variant="ghost" size="sm" onClick={() => setAgeRange('')}>
+          {ageRange !== 'all' && (
+            <Button variant="ghost" size="sm" onClick={() => setAgeRange('all')}>
               Clear filters
             </Button>
           )}

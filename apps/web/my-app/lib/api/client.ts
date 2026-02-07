@@ -100,19 +100,24 @@ class ApiClient {
   }
 
   // User Progress API
-  async getUserProgress(userId?: string): Promise<ProgressSummary> {
-    const params: Record<string, string> = {};
-    if (userId) {
-      params.user_id = userId;
-    }
+  async getUserProgress(userId: string): Promise<ProgressSummary> {
     const response = await this.client.get<ProgressSummary>('/users/progress', {
-      params,
+      params: { user_id: userId },
     });
     return response.data;
   }
 
   async updateProgress(data: ProgressUpdateRequest): Promise<{ success: boolean }> {
-    const response = await this.client.post<{ success: boolean }>('/users/progress', data);
+    // Backend expects query parameters, not JSON body
+    const response = await this.client.post<{ success: boolean }>('/users/progress', null, {
+      params: {
+        user_id: data.user_id,
+        story_id: data.story_id,
+        current_node_id: data.current_node_id,
+        is_completed: data.is_completed ?? false,
+        time_spent_sec: data.time_spent_sec ?? 0,
+      },
+    });
     return response.data;
   }
 }
