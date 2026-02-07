@@ -15,16 +15,38 @@ class R2Service:
     def __init__(self):
         self.bucket_name = settings.r2_bucket_name
         self.public_url = settings.r2_public_url
+        self.account_id = settings.r2_account_id
+        self.access_key_id = settings.r2_access_key_id
+        self.secret_access_key = settings.r2_secret_access_key
+        self._s3_client = None
 
-        # R2 is S3-compatible
-        self.s3_client = boto3.client(
-            service_name="s3",
-            endpoint_url=f"https://{settings.r2_account_id}.r2.cloudflarestorage.com",
-            aws_access_key_id=settings.r2_access_key_id,
-            aws_secret_access_key=settings.r2_secret_access_key,
-            config=Config(signature_version="s3v4"),
-            region_name="auto",  # R2 uses 'auto' region
-        )
+    @property
+    def s3_client(self):
+        """Lazy load S3 client only when needed"""
+        if self._s3_client is None:
+            # Check if R2 is configured
+            if not all(
+                [
+                    self.account_id,
+                    self.access_key_id,
+                    self.secret_access_key,
+                    self.bucket_name,
+                ]
+            ):
+                raise ValueError(
+                    "R2 credentials not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME"
+                )
+
+            # R2 is S3-compatible
+            self._s3_client = boto3.client(
+                service_name="s3",
+                endpoint_url=f"https://{self.account_id}.r2.cloudflarestorage.com",
+                aws_access_key_id=self.access_key_id,
+                aws_secret_access_key=self.secret_access_key,
+                config=Config(signature_version="s3v4"),
+                region_name="auto",  # R2 uses 'auto' region
+            )
+        return self._s3_client
 
     async def upload_audio(
         self,
@@ -47,6 +69,18 @@ class R2Service:
         Returns:
             Public URL of uploaded file or None if failed
         """
+        # Check if R2 is configured
+        if not all(
+            [
+                self.account_id,
+                self.access_key_id,
+                self.secret_access_key,
+                self.bucket_name,
+            ]
+        ):
+            print("⚠️  R2 not configured - returning placeholder URL")
+            return None
+
         try:
             # Create key: stories/{slug}/audio/{language}/{speaker}/{node_id}.mp3
             file_key = f"stories/{story_slug}/audio/{language}/{speaker}/{node_id}.mp3"
@@ -69,7 +103,7 @@ class R2Service:
                 return f"{self.public_url}/{file_key}"
             else:
                 # Construct URL from endpoint
-                return f"https://{settings.r2_account_id}.r2.cloudflarestorage.com/{self.bucket_name}/{file_key}"
+                return f"https://{self.account_id}.r2.cloudflarestorage.com/{self.bucket_name}/{file_key}"
 
         except Exception as e:
             print(f"R2 upload error: {e}")
