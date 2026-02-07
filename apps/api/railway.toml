@@ -1,8 +1,9 @@
 [build]
 builder = "nixpacks"
+source = "apps/api"
 
 [deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+startCommand = "bash apps/api/start.sh"
 healthcheckPath = "/health"
 restartPolicyType = "on_failure"
 
