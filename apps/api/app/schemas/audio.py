@@ -22,6 +22,9 @@ class AudioResponse(BaseModel):
 class AudioGeneratingResponse(BaseModel):
     node_id: UUID
     language: str
+    code_mix_ratio: float = 0.0
+    speaker: str = "meera"
+    audio_url: str = ""
     status: str = "generating"
     estimated_wait_sec: int = 5
     retry_after: int = 5

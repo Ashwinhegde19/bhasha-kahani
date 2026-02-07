@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 import uuid as uuid_module
+from typing import Union
 
 from app.database import get_db
 from app.models.audio import AudioFile
@@ -16,7 +17,7 @@ bulbul_service = BulbulService()
 cache_service = CacheService()
 
 
-@router.get("/{node_id}", response_model=AudioResponse)
+@router.get("/{node_id}", response_model=Union[AudioResponse, AudioGeneratingResponse])
 async def get_audio(
     node_id: UUID,
     language: str = Query(..., description="Language code: en, hi, kn"),
@@ -82,10 +83,13 @@ async def get_audio(
     audio_bytes = await bulbul_service.synthesize(text, language, speaker, code_mix)
     
     if not audio_bytes:
-        # Return generating status
+        # Return generating status with all required fields
         return AudioGeneratingResponse(
             node_id=node_id,
             language=language,
+            code_mix_ratio=code_mix,
+            speaker=speaker,
+            audio_url="",
             status="generating",
             estimated_wait_sec=5,
             retry_after=5
