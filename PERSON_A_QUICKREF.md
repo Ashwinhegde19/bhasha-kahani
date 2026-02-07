@@ -12,22 +12,10 @@
 
 ### Hour 1-2: Foundation
 ```bash
-# Setup (30 min)
-cd apps/api
-python -m venv venv && source venv/bin/activate
-pip install fastapi uvicorn sqlalchemy asyncpg alembic pydantic httpx python-dotenv
-
-# Models (30 min)
-# - User, Story, StoryNode, StoryChoice
-
-# Database (30 min)
-alembic init alembic
-alembic revision --autogenerate -m "initial"
-alembic upgrade head
-
-# Bulbul Test (30 min)
-# - Test API connection
-# - Generate 1 sample audio
+# ✅ Setup (30 min) - DONE
+# ✅ Models (30 min) - DONE (User, Story, StoryNode, StoryChoice, etc.)
+# ✅ Database (30 min) - DONE (Supabase PostgreSQL connected, migrations run)
+# ⏳ Bulbul Test (30 min) - PENDING
 ```
 
 ### Hour 3-4: Core APIs
@@ -93,7 +81,7 @@ railway up
 # Clone and setup
 git clone <repo-url>
 cd bhasha-kahani
-git checkout -b feature/PP-sprint
+git checkout -b feature/backend-sprint
 
 # Setup backend
 cd apps/api
@@ -139,7 +127,7 @@ git add .
 git commit -m "[PP] feat: what you built"
 
 # At sync points
-git push origin feature/PP-sprint
+git push origin feature/backend-sprint
 
 # Jackie needs your changes?
 git checkout develop
@@ -208,11 +196,12 @@ async def generate_audio(text: str, language: str, speaker: str):
 
 ## ✅ Success Checklist
 
-- [ ] API endpoints work
-- [ ] Database migrations run
-- [ ] Bulbul generates audio
-- [ ] 3 stories in DB
-- [ ] All audio uploaded to R2
-- [ ] Deployed to Railway
+- [x] API endpoints created
+- [x] Database migrations run
+- [x] Supabase PostgreSQL connected
+- [ ] Bulbul generates audio (pending)
+- [ ] 3 stories in DB (pending)
+- [ ] All audio uploaded to R2 (pending)
+- [ ] Deployed to production (pending)
 
 **Full details in 10_HOUR_SPRINT.md**
