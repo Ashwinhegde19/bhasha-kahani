@@ -53,8 +53,8 @@ async def deploy_to_render():
                 print("❌ No workspaces found!")
                 return False
 
-            owner_id = workspaces[0]["id"]
-            owner_name = workspaces[0]["name"]
+            owner_id = workspaces[0]["owner"]["id"]
+            owner_name = workspaces[0]["owner"]["name"]
             print(f"   ✓ Found workspace: {owner_name}")
 
         except Exception as e:
@@ -68,17 +68,19 @@ async def deploy_to_render():
             "name": "bhasha-kahani-api",
             "ownerId": owner_id,
             "repo": "https://github.com/Ashwinhegde19/bhasha-kahani",
-            "branch": "develop",
-            "rootDir": "apps/api",
-            "runtime": "python",
-            "plan": "free",
-            "region": "singapore",
-            "buildCommand": "pip install -r requirements.txt",
-            "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
-            "healthCheckPath": "/health",
+            "serviceDetails": {
+                "runtime": "python",
+                "region": "singapore",
+                "plan": "starter",  # Using starter instead of free for better API support
+                "branch": "develop",
+                "rootDir": "apps/api",
+                "buildCommand": "pip install -r requirements.txt",
+                "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+                "healthCheckPath": "/health",
+                "envSpecificDetails": {"runtime": "python"},
+            },
             "envVars": [
                 {"key": "DATABASE_URL", "value": settings.database_url},
-                {"key": "REDIS_URL", "value": settings.redis_url},
                 {"key": "SUPABASE_SERVICE_KEY", "value": settings.supabase_service_key},
                 {"key": "SARVAM_API_KEY", "value": settings.sarvam_api_key},
                 {"key": "SECRET_KEY", "value": settings.secret_key},
@@ -95,9 +97,9 @@ async def deploy_to_render():
 
             if response.status_code == 201:
                 service = response.json()
-                service_id = service["id"]
-                service_name = service["name"]
-                service_url = service["url"]
+                service_id = service.get("id", "unknown")
+                service_name = service.get("name", "unknown")
+                service_url = service.get("serviceDetails", {}).get("url", "unknown")
 
                 print(f"   ✓ Service created: {service_name}")
                 print(f"   ✓ Service ID: {service_id}")
@@ -113,6 +115,7 @@ async def deploy_to_render():
             elif response.status_code == 409:
                 print("   ⚠️  Service already exists!")
                 print("   Check your Render dashboard for 'bhasha-kahani-api'")
+                print("   URL: https://dashboard.render.com")
                 return True
             else:
                 print(f"❌ Failed to create service: {response.status_code}")
@@ -134,15 +137,20 @@ async def main():
 
     print("\n" + "=" * 60)
     if success:
-        print("✅ DEPLOYMENT COMPLETE!")
+        print("✅ DEPLOYMENT INITIATED!")
         print("=" * 60)
         print("\n📝 Next steps:")
         print("   1. Wait 2-3 minutes for build to complete")
         print("   2. Check status: https://dashboard.render.com")
-        print("   3. Test API: curl https://bhasha-kahani-api.onrender.com/health")
+        print("   3. Test API once live")
     else:
         print("❌ DEPLOYMENT FAILED")
         print("=" * 60)
+        print("\n💡 Alternative: Deploy manually via dashboard")
+        print("   1. Go to https://dashboard.render.com/services")
+        print("   2. Click 'New +' → 'Web Service'")
+        print("   3. Connect your GitHub repo")
+        print("   4. Configure settings from render.yaml")
         sys.exit(1)
 
     print()
