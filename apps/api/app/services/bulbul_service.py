@@ -8,21 +8,37 @@ settings = get_settings()
 # Language code mapping for Bulbul API
 LANGUAGE_CODES = {"en": "en-IN", "hi": "hi-IN", "kn": "kn-IN"}
 
-# Bulbul speaker voices mapping - Valid speakers for bulbul:v3
-# From Sarvam docs: shubh, aditya, ritu, priya, neha, rahul, pooja, rohan, simran, kavya,
-# amit, dev, ishita, shreya, ratan, varun, manan, sumit, roopa, kabir, aayan, ashutosh,
-# advait, amelia, sophia, anand, tanya, tarun, sunny, mani, gokul, vijay, shruti,
-# suhani, mohit, kavitha, rehan, soham, rupali
-SPEAKER_VOICES = {
-    "meera": "shubh",  # Warm elderly female -> map to shubh
-    "arvind": "aditya",  # Young male
-    "pooja": "pooja",  # Young female (valid)
-    "amol": "amit",  # Middle-aged male
-    "neha": "neha",  # Cheerful female (valid)
-    "ajji": "shubh",  # Narrator - warm female
-    "punyakoti": "pooja",  # Gentle female
-    "arbhuta": "amit",  # Fierce male
+# IMPROVED: Better voice mappings based on Sarvam characteristics
+# From Sarvam docs - Voice characteristics:
+# Shubh: Confident, Warm (Male) - Best for narration
+# Roopa: Clear, Professional (Female) - Good for narrator
+# Aditya: Deep, Authoritative (Male) - Best for serious/fierce characters
+# Priya: Friendly, Conversational (Female) - Best for gentle/motherly
+# Ritu: Balanced, Clear (Female)
+# Neha: Energetic, Cheerful (Female)
+# Rahul: Young, Energetic (Male)
+# Kavya: Soft, Gentle (Female)
+# Ishita: Warm, Caring (Female)
+# Amit: Strong, Bold (Male)
+
+CHARACTER_VOICE_MAPPING = {
+    # Story characters - Punyakoti
+    "ajji": "shubh",  # Narrator: Warm, confident male voice (better than female for storytelling)
+    "punyakoti": "priya",  # Gentle cow: Friendly, conversational female
+    "arbhuta": "aditya",  # Fierce tiger: Deep, authoritative male
+    # Alternative mappings for variety
+    "narrator": "shubh",  # Warm storyteller
+    "hero": "aditya",  # Deep, heroic
+    "heroine": "priya",  # Friendly, relatable
+    "villain": "rahul",  # Strong, bold
+    "elder": "shubh",  # Warm, authoritative
+    "child": "kavya",  # Soft, gentle
+    "crow": "neha",  # Energetic, cheerful
+    "fox": "aditya",  # Deep, cunning
 }
+
+# Default temperature for expressiveness (0.6 is default, 0.8 is more expressive)
+DEFAULT_TEMPERATURE = 0.75
 
 
 class BulbulService:
@@ -36,16 +52,22 @@ class BulbulService:
         }
 
     async def synthesize(
-        self, text: str, language: str, speaker: str = "shubh", code_mix: float = 0.0
+        self,
+        text: str,
+        language: str,
+        speaker: str = "shubh",
+        code_mix: float = 0.0,
+        temperature: float = None,
     ) -> Optional[bytes]:
         """
-        Generate audio using Sarvam Bulbul API
+        Generate audio using Sarvam Bulbul API with improved human-like voices
 
         Args:
             text: Text to synthesize
             language: Language code (en, hi, kn)
-            speaker: Speaker voice ID
+            speaker: Speaker voice ID (character name)
             code_mix: Code mixing ratio (0.0 to 1.0)
+            temperature: Voice expressiveness (0.01 to 2.0, default 0.75)
 
         Returns:
             Audio bytes or None if failed
@@ -56,23 +78,31 @@ class BulbulService:
         # Map language code
         bulbul_lang = LANGUAGE_CODES.get(language, f"{language}-IN")
 
-        # Map speaker to valid Bulbul speaker
-        bulbul_speaker = SPEAKER_VOICES.get(speaker, speaker)
+        # IMPROVED: Map character to best Bulbul voice
+        bulbul_speaker = CHARACTER_VOICE_MAPPING.get(speaker.lower(), speaker)
+
+        # Use temperature for more human-like expressiveness
+        if temperature is None:
+            temperature = DEFAULT_TEMPERATURE
 
         # Build payload according to Sarvam API docs
-        # Note: bulbul:v3 doesn't support pitch, loudness, enable_preprocessing
+        # IMPROVED: Added temperature for better expressiveness
         payload = {
             "text": text,
             "target_language_code": bulbul_lang,
             "speaker": bulbul_speaker,
             "model": "bulbul:v3",
-            "pace": 1.0,
-            "speech_sample_rate": "22050",
+            "pace": 1.0,  # Normal pace
+            "speech_sample_rate": "24000",  # Higher quality
+            "temperature": temperature,  # More expressive/human-like
+            # Note: WAV format (default) for pydub compatibility
         }
 
         async with httpx.AsyncClient() as client:
             try:
-                print(f"Bulbul API request: {payload}")
+                print(
+                    f"Bulbul API request: speaker={bulbul_speaker}, lang={bulbul_lang}, temp={temperature}"
+                )
                 response = await client.post(
                     f"{self.base_url}/text-to-speech",
                     headers=self.headers,
@@ -102,17 +132,41 @@ class BulbulService:
                 return None
 
     async def get_voices(self) -> list:
-        """Get available voices from Bulbul API"""
-        # Return local voice mapping for now
+        """Get available voices with characteristics"""
         return [
             {
-                "id": "meera",
-                "name": "Meera",
+                "id": "ajji",
+                "name": "Ajji (Narrator)",
                 "gender": "female",
-                "style": "warm_elderly",
+                "bulbul_voice": "shubh",
+                "characteristics": "Warm, Confident - Perfect for storytelling",
             },
-            {"id": "arvind", "name": "Arvind", "gender": "male", "style": "young"},
-            {"id": "pooja", "name": "Pooja", "gender": "female", "style": "young"},
-            {"id": "amol", "name": "Amol", "gender": "male", "style": "middle_aged"},
-            {"id": "neha", "name": "Neha", "gender": "female", "style": "cheerful"},
+            {
+                "id": "punyakoti",
+                "name": "Punyakoti",
+                "gender": "female",
+                "bulbul_voice": "priya",
+                "characteristics": "Friendly, Conversational - Gentle and motherly",
+            },
+            {
+                "id": "arbhuta",
+                "name": "Arbhuta (Tiger)",
+                "gender": "male",
+                "bulbul_voice": "aditya",
+                "characteristics": "Deep, Authoritative - Fierce and powerful",
+            },
+            {
+                "id": "crow",
+                "name": "Crow",
+                "gender": "female",
+                "bulbul_voice": "neha",
+                "characteristics": "Energetic, Cheerful - Smart and clever",
+            },
+            {
+                "id": "fox",
+                "name": "Fox",
+                "gender": "male",
+                "bulbul_voice": "aditya",
+                "characteristics": "Deep, Cunning - Clever trickster",
+            },
         ]

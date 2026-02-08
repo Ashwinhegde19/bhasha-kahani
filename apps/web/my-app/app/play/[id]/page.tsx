@@ -1,10 +1,10 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Play, Pause, Volume2, Loader2, Globe } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Volume2, Loader2, Globe, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/lib/api';
@@ -14,8 +14,12 @@ import { LANGUAGES } from '@/lib/constants';
 export default function PlayStoryPage() {
   const params = useParams();
   const storyId = params.id as string;
-  const [playing, setPlaying] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentNodeIndex, setCurrentNodeIndex] = useState(0);
+  const [showChoices, setShowChoices] = useState(false);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [choicesMade, setChoicesMade] = useState<{nodeId: string, choiceKey: string}[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Get user language preference
   const { user } = useUserStore();
@@ -28,8 +32,8 @@ export default function PlayStoryPage() {
     }
   }, [user]);
 
-  // Get story details with loading state
-  const { data: story, isLoading: storyLoading, error: storyError } = useQuery({
+  // Get story details
+  const { data: story, isLoading: storyLoading } = useQuery({
     queryKey: ['story', storyId],
     queryFn: async () => {
       const stories = await api.listStories();
@@ -40,52 +44,89 @@ export default function PlayStoryPage() {
     enabled: !!storyId,
   });
 
-  // Pre-generate all languages when story loads
-  const { data: pregenData } = useQuery({
-    queryKey: ['pre-generate', storyId],
+  // Get current node
+  const narrationNodes = story?.nodes?.filter((n: any) => n.node_type === 'narration') || [];
+  const choiceNodes = story?.nodes?.filter((n: any) => n.node_type === 'choice') || [];
+  const currentNode = narrationNodes[currentNodeIndex];
+  
+  // Get audio for current node
+  const { data: nodeAudio, isLoading: audioLoading } = useQuery({
+    queryKey: ['node-audio', currentNode?.id, selectedLanguage],
     queryFn: () => {
-      if (!storyId) return null;
-      return api.preGenerateAllLanguages(storyId);
+      if (!currentNode?.id) return null;
+      return api.getAudioUrl(currentNode.id, { 
+        language: selectedLanguage,
+        speaker: currentNode?.character?.bulbul_speaker || 'meera'
+      });
     },
-    enabled: !!storyId,
-    staleTime: Infinity, // Only run once
+    enabled: !!currentNode?.id,
   });
 
-  // Get full story audio with selected language
-  const { data: audioData, isLoading: audioLoading } = useQuery({
-    queryKey: ['full-story-audio', storyId, selectedLanguage],
-    queryFn: () => {
-      if (!storyId) return null;
-      return api.getFullStoryAudio(storyId, selectedLanguage);
+  // Make choice mutation
+  const makeChoiceMutation = useMutation({
+    mutationFn: ({ nodeId, choiceKey }: { nodeId: string, choiceKey: string }) => {
+      if (!story?.slug) throw new Error('Story not loaded');
+      return api.makeChoice(story.slug, { node_id: nodeId, choice_key: choiceKey });
     },
-    enabled: !!storyId,
+    onSuccess: (data) => {
+      // Find the next node index
+      const nextNodeId = data.next_node?.id;
+      const nextIndex = narrationNodes.findIndex((n: any) => n.id === nextNodeId);
+      if (nextIndex !== -1) {
+        setCurrentNodeIndex(nextIndex);
+        setShowChoices(false);
+      }
+    },
   });
 
   const handleLanguageChange = (langCode: string) => {
     setSelectedLanguage(langCode);
-    // Pause current audio if playing
-    if (audioElement) {
-      audioElement.pause();
-      setPlaying(null);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setPlaying(false);
     }
   };
 
-  const playAudio = (url: string, nodeId: string) => {
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.currentTime = 0;
+  const playCurrentNode = () => {
+    if (!nodeAudio?.audio_url) return;
+    
+    if (audioRef.current) {
+      audioRef.current.pause();
     }
 
-    if (playing === nodeId) {
-      setPlaying(null);
-      return;
-    }
-
-    const audio = new Audio(url);
-    audio.onended = () => setPlaying(null);
+    const audio = new Audio(nodeAudio.audio_url);
+    audio.onended = () => {
+      setPlaying(false);
+      // Check if next node is a choice
+      const nextNode = narrationNodes[currentNodeIndex + 1];
+      if (nextNode?.node_type === 'choice') {
+        setShowChoices(true);
+      } else if (currentNodeIndex < narrationNodes.length - 1) {
+        setCurrentNodeIndex(prev => prev + 1);
+      }
+    };
     audio.play().catch(e => console.error('Audio play error:', e));
-    setAudioElement(audio);
-    setPlaying(nodeId);
+    audioRef.current = audio;
+    setPlaying(true);
+  };
+
+  const handleChoice = (choiceKey: string) => {
+    const currentChoiceNode = choiceNodes.find((n: any) => 
+      narrationNodes[currentNodeIndex]?.display_order < n.display_order &&
+      narrationNodes[currentNodeIndex + 1]?.display_order > n.display_order
+    );
+    
+    if (currentChoiceNode) {
+      setChoicesMade(prev => [...prev, { nodeId: currentChoiceNode.id, choiceKey }]);
+      makeChoiceMutation.mutate({ nodeId: currentChoiceNode.id, choiceKey });
+    }
+  };
+
+  const goToNextNode = () => {
+    if (currentNodeIndex < narrationNodes.length - 1) {
+      setCurrentNodeIndex(prev => prev + 1);
+      setShowChoices(false);
+    }
   };
 
   if (storyLoading) {
@@ -94,19 +135,6 @@ export default function PlayStoryPage() {
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading story...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (storyError) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Error Loading Story</h1>
-          <Button asChild>
-            <Link href="/stories">Browse Stories</Link>
-          </Button>
         </div>
       </div>
     );
@@ -127,105 +155,190 @@ export default function PlayStoryPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
       <div className="container mx-auto px-4 py-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/stories/${story.slug}`}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Story
-          </Link>
-        </Button>
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/stories/${story.slug}`}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Story
+            </Link>
+          </Button>
+          
+          {/* Language Selector */}
+          <div className="flex gap-2">
+            {LANGUAGES.filter(lang => story.available_languages?.includes(lang.code)).map((lang) => (
+              <Button
+                key={lang.code}
+                variant={selectedLanguage === lang.code ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleLanguageChange(lang.code)}
+              >
+                <span className="mr-1">{lang.flag}</span>
+                {lang.code.toUpperCase()}
+              </Button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8 text-center">{story.title}</h1>
+      {/* Progress Bar */}
+      <div className="container mx-auto px-4 mb-4">
+        <div className="w-full bg-muted rounded-full h-2">
+          <div 
+            className="bg-primary h-2 rounded-full transition-all"
+            style={{ width: `${((currentNodeIndex + 1) / narrationNodes.length) * 100}%` }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground mt-1 text-center">
+          Part {currentNodeIndex + 1} of {narrationNodes.length}
+        </p>
+      </div>
 
-        {/* Language Selector */}
-        <Card className="max-w-2xl mx-auto mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Globe className="w-5 h-5" />
-              <span className="font-medium">Select Language:</span>
-              {pregenData && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  (Preparing {pregenData.languages.length} languages...)
-                </span>
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-4 max-w-3xl">
+        {/* Character Avatar */}
+        {currentNode?.character && (
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              {currentNode.character.avatar_url ? (
+                <img 
+                  src={currentNode.character.avatar_url} 
+                  alt={currentNode.character.name}
+                  className="w-10 h-10 rounded-full"
+                />
+              ) : (
+                <Volume2 className="w-6 h-6 text-primary" />
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              {LANGUAGES.filter(lang => story.available_languages?.includes(lang.code)).map((lang) => (
-                <Button
-                  key={lang.code}
-                  variant={selectedLanguage === lang.code ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => handleLanguageChange(lang.code)}
-                  disabled={audioLoading && selectedLanguage === lang.code}
-                >
-                  <span className="mr-2">{lang.flag}</span>
-                  {lang.name}
-                  {audioLoading && selectedLanguage === lang.code && (
-                    <Loader2 className="w-3 h-3 ml-2 animate-spin" />
-                  )}
-                </Button>
-              ))}
+            <div>
+              <p className="font-medium">{currentNode.character.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {LANGUAGES.find(l => l.code === selectedLanguage)?.name}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              First time selecting a language may take 30-60 seconds to generate. 
-              After that, it plays instantly!
+          </div>
+        )}
+
+        {/* Story Text */}
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <p className="text-xl leading-relaxed">
+              {(currentNode as any)?.text?.[selectedLanguage] || (currentNode as any)?.text?.['en'] || (currentNode as any)?.text_content?.[selectedLanguage] || (currentNode as any)?.text_content?.['en']}
             </p>
           </CardContent>
         </Card>
 
+        {/* Audio Controls */}
         {audioLoading ? (
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Generating audio in {LANGUAGES.find(l => l.code === selectedLanguage)?.name}...</p>
+          <div className="text-center py-4">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+            <p className="text-sm text-muted-foreground mt-2">Loading audio...</p>
           </div>
-        ) : audioData?.audio_url ? (
-          <Card className="max-w-2xl mx-auto">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <Button
-                  size="lg"
-                  onClick={() => playAudio(audioData.audio_url, 'full-story')}
-                >
-                  {playing === 'full-story' ? (
-                    <Pause className="w-5 h-5 mr-2" />
-                  ) : (
-                    <Play className="w-5 h-5 mr-2" />
-                  )}
-                  {playing === 'full-story' ? 'Pause' : 'Play Full Story'}
-                </Button>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Volume2 className="w-5 h-5" />
-                  <span>Audio from Sarvam AI</span>
-                </div>
-              </div>
-              
-              <div className="mt-4 p-4 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground mb-2">Audio URL:</p>
-                <a 
-                  href={audioData.audio_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-500 hover:underline break-all"
-                >
-                  {audioData.audio_url}
-                </a>
-              </div>
+        ) : nodeAudio?.audio_url ? (
+          <div className="flex justify-center gap-4 mb-6">
+            <Button
+              size="lg"
+              onClick={playCurrentNode}
+              disabled={playing}
+            >
+              {playing ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Playing...
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5 mr-2" />
+                  Listen
+                </>
+              )}
+            </Button>
+            
+            {!showChoices && currentNodeIndex < narrationNodes.length - 1 && (
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={goToNextNode}
+              >
+                Skip
+                <ChevronRight className="w-5 h-5 ml-2" />
+              </Button>
+            )}
+          </div>
+        ) : null}
 
-              <div className="mt-4 text-sm text-muted-foreground">
-                <p>Language: {LANGUAGES.find(l => l.code === selectedLanguage)?.name}</p>
-                <p>Total Nodes: {audioData.total_nodes}</p>
-                <p>Duration: {Math.round(audioData.total_duration_sec)} seconds</p>
-                <p>File Size: {((audioData.file_size || 0) / 1024).toFixed(1)} KB</p>
+        {/* Choice Overlay */}
+        {showChoices && (
+          <Card className="border-2 border-primary">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-center">
+                What happens next?
+              </h3>
+              <div className="space-y-3">
+                {/* Get choices from the next choice node */}
+                {(() => {
+                  const nextChoiceNode = choiceNodes.find((n: any) => 
+                    n.display_order > currentNode?.display_order
+                  );
+                  
+                  return nextChoiceNode?.choices?.map((choice: any) => (
+                    <Button
+                      key={choice.choice_key}
+                      variant="outline"
+                      size="lg"
+                      className="w-full justify-start text-left h-auto py-4"
+                      onClick={() => handleChoice(choice.choice_key)}
+                      disabled={makeChoiceMutation.isPending}
+                    >
+                      <span className="bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center mr-3 shrink-0">
+                        {choice.choice_key}
+                      </span>
+                      <span>
+                        {choice.text?.[selectedLanguage] || choice.text?.['en']}
+                      </span>
+                    </Button>
+                  ));
+                })()}
               </div>
             </CardContent>
           </Card>
-        ) : (
-          <div className="text-center">
-            <p className="text-muted-foreground">Audio not available for this language</p>
-          </div>
         )}
+
+        {/* Story Complete */}
+        {currentNodeIndex === narrationNodes.length - 1 && !showChoices && (
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="p-6 text-center">
+              <h3 className="text-xl font-bold text-green-800 mb-2">
+                🎉 Story Complete!
+              </h3>
+              <p className="text-green-700 mb-4">
+                You finished "{story.title}" in {LANGUAGES.find(l => l.code === selectedLanguage)?.name}
+              </p>
+              <div className="flex justify-center gap-3">
+                <Button onClick={() => {
+                  setCurrentNodeIndex(0);
+                  setChoicesMade([]);
+                  setShowChoices(false);
+                }}>
+                  Play Again
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/stories">More Stories</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Debug Info */}
+        <div className="mt-8 p-4 bg-muted rounded-lg text-xs text-muted-foreground">
+          <p>Debug Info:</p>
+          <p>Current Node: {currentNodeIndex + 1} / {narrationNodes.length}</p>
+          <p>Node Type: {currentNode?.node_type}</p>
+          <p>Character: {currentNode?.character?.name}</p>
+          <p>Choices Made: {choicesMade.length}</p>
+        </div>
       </div>
     </div>
   );
