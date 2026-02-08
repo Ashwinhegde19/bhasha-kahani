@@ -15,16 +15,22 @@ export default function StoryDetailPage() {
   const params = useParams();
   const slug = params.slug as string;
 
-  const { data: story, isLoading } = useQuery({
+  const { data: story, isLoading, error } = useQuery({
     queryKey: ['story', slug],
     queryFn: () => api.getStory(slug),
     enabled: !!slug,
   });
 
+  // Debug logging
+  console.log('StoryDetailPage render:', { slug, isLoading, hasData: !!story, hasError: !!error });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
+          <div className="text-center mb-4">
+            <span className="text-sm text-muted-foreground">Loading story...</span>
+          </div>
           <Skeleton className="h-8 w-32 mb-6" />
           <div className="grid md:grid-cols-2 gap-8">
             <Skeleton className="aspect-[4/3] rounded-lg" />
@@ -36,6 +42,23 @@ export default function StoryDetailPage() {
               <Skeleton className="h-12 w-48 mt-6" />
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <BookOpen className="w-16 h-16 mx-auto text-destructive/50 mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Error Loading Story</h1>
+          <p className="text-muted-foreground mb-4">
+            {error instanceof Error ? error.message : 'Failed to load story'}
+          </p>
+          <Button asChild>
+            <Link href="/stories">Browse All Stories</Link>
+          </Button>
         </div>
       </div>
     );
