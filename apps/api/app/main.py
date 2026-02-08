@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import time
+import traceback
 
 from app.config import get_settings
 from app.routers import auth, stories, audio, users, choices
@@ -15,6 +16,20 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Return detailed errors temporarily for debugging deployment"""
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": str(exc),
+            "type": type(exc).__name__,
+            "traceback": traceback.format_exc()[-800:],
+        },
+    )
+
 
 # CORS - Allow frontend to call API
 app.add_middleware(
