@@ -16,14 +16,15 @@ is_pooler = ":6543" in DATABASE_URL or "pooler.supabase.com" in DATABASE_URL
 
 if is_pooler:
     # Supabase pooler (transaction mode): disable prepared statements, use NullPool
-    # Append prepared_statement_cache_size=0 to the URL for asyncpg
-    separator = "&" if "?" in DATABASE_URL else "?"
-    DATABASE_URL = f"{DATABASE_URL}{separator}prepared_statement_cache_size=0&statement_cache_size=0"
     engine = create_async_engine(
         DATABASE_URL,
         echo=False,
         future=True,
         poolclass=NullPool,
+        connect_args={
+            "prepared_statement_cache_size": 0,
+            "statement_cache_size": 0,
+        },
     )
 else:
     # Direct connection: use SQLAlchemy connection pooling
