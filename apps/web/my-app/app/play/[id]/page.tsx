@@ -49,6 +49,7 @@ export default function PlayStoryPage() {
   const [hasListenedToLast, setHasListenedToLast] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoPlayNextRef = useRef(false);
+  const playingNodeIdRef = useRef<string | null>(null);
 
   // Get user language preference
   const { language: storedLanguage, setLanguage } = useUserStore();
@@ -105,14 +106,20 @@ export default function PlayStoryPage() {
   });
 
   // Play audio
-  const playAudio = useCallback((audioUrl: string) => {
+  const playAudio = useCallback((audioUrl: string, nodeId?: string) => {
+    // Prevent duplicate play attempts on the same node
+    if (nodeId && playingNodeIdRef.current === nodeId) return;
+
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
 
+    if (nodeId) playingNodeIdRef.current = nodeId;
+
     const audio = new Audio(audioUrl);
     audio.onended = () => {
+      playingNodeIdRef.current = null;
       setPlaying(false);
       if (autoPlayNextRef.current) {
         setCurrentNodeIndex((prev) => prev + 1);
@@ -120,18 +127,33 @@ export default function PlayStoryPage() {
         setHasListenedToLast(true);
       }
     };
-    audio.play().catch(() => setPlaying(false));
+    audio.onerror = () => {
+      playingNodeIdRef.current = null;
+      setPlaying(false);
+    };
+    audio.play().catch(() => {
+      playingNodeIdRef.current = null;
+      setPlaying(false);
+    });
     audioRef.current = audio;
     setPlaying(true);
   }, []);
 
-  // Auto-play on node change
+  // Auto-play on node change — only triggers when nodeAudio or audioLoading changes,
+  // NOT when playing changes (that was causing the flicker loop)
   useEffect(() => {
-    if (autoPlayNextRef.current && nodeAudio?.audio_url && !audioLoading && !playing) {
-      const timer = setTimeout(() => playAudio(nodeAudio.audio_url), 100);
+    if (autoPlayNextRef.current && nodeAudio?.audio_url && !audioLoading) {
+      // Small delay to let the UI settle before playing
+      const timer = setTimeout(() => {
+        // Guard: don't auto-play if already playing something
+        if (!audioRef.current || audioRef.current.paused || audioRef.current.ended) {
+          playAudio(nodeAudio.audio_url, currentNode?.id);
+        }
+      }, 100);
       return () => clearTimeout(timer);
     }
-  }, [nodeAudio, audioLoading, playing, playAudio]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodeAudio, audioLoading, playAudio]);
 
   // Clamp index
   useEffect(() => {
@@ -146,6 +168,7 @@ export default function PlayStoryPage() {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    playingNodeIdRef.current = null;
     setPlaying(false);
     autoPlayNextRef.current = false;
   }, []);
@@ -163,19 +186,24 @@ export default function PlayStoryPage() {
   const handlePlayPause = () => {
     if (playing && audioRef.current) {
       audioRef.current.pause();
+      playingNodeIdRef.current = null;
       setPlaying(false);
       autoPlayNextRef.current = false;
       return;
     }
     if (audioRef.current && audioRef.current.paused && !audioRef.current.ended) {
-      audioRef.current.play().catch(() => setPlaying(false));
+      audioRef.current.play().catch(() => {
+        playingNodeIdRef.current = null;
+        setPlaying(false);
+      });
       setPlaying(true);
       autoPlayNextRef.current = true;
       return;
     }
     if (!nodeAudio?.audio_url) return;
     autoPlayNextRef.current = true;
-    playAudio(nodeAudio.audio_url);
+    playingNodeIdRef.current = null; // Clear so playAudio won't skip
+    playAudio(nodeAudio.audio_url, currentNode?.id);
   };
 
   const goToPrev = () => {
