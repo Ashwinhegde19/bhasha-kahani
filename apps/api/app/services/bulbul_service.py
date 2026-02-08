@@ -71,7 +71,7 @@ CHARACTER_VOICE_MAPPING = {
 }
 
 # Default temperature for expressiveness (0.6 is default, 0.8 is more expressive)
-DEFAULT_TEMPERATURE = 0.75
+DEFAULT_TEMPERATURE = 1.0  # Maximum stable expressiveness for storytelling
 
 
 class BulbulService:
@@ -132,7 +132,7 @@ class BulbulService:
             "speaker": bulbul_speaker,
             "model": "bulbul:v3",
             "pace": 0.95,  # Slightly slower for storytelling
-            "speech_sample_rate": "24000",  # Higher quality
+            "speech_sample_rate": "44100",  # CD quality
             "temperature": temperature,  # More expressive/human-like
         }
 
