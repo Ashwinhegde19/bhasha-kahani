@@ -59,12 +59,15 @@ CHARACTER_VOICE_MAPPING = {
     "ajji": "shubh",  # Narrator: Warm, confident male voice (better than female for storytelling)
     "punyakoti": "priya",  # Gentle cow: Friendly, conversational female
     "arbhuta": "aditya",  # Fierce tiger: Deep, authoritative male
+    # Story characters - Clever Crow
+    "dadi": "ishita",  # Grandmother narrator: Warm, caring female
+    "kauva": "neha",  # Crow: Energetic, cheerful female
     # Alternative mappings for variety
     "narrator": "shubh",  # Warm storyteller
     "hero": "aditya",  # Deep, heroic
     "heroine": "priya",  # Friendly, relatable
     "villain": "rahul",  # Strong, bold
-    "elder": "shubh",  # Warm, authoritative
+    "elder": "ishita",  # Warm, caring female
     "child": "kavya",  # Soft, gentle
     "crow": "neha",  # Energetic, cheerful
     "fox": "aditya",  # Deep, cunning
@@ -172,22 +175,28 @@ class BulbulService:
     def get_speaker_for_character(self, character_name: str) -> str:
         """Get the appropriate Bulbul speaker voice for a character name"""
         if not character_name:
-            return "meera"
+            return "shubh"
 
         name_lower = character_name.lower()
 
-        # Map character names to voices
+        # Check direct mapping first
+        if name_lower in CHARACTER_VOICE_MAPPING:
+            return CHARACTER_VOICE_MAPPING[name_lower]
+
+        # Keyword-based mapping
         if (
-            "ajji" in name_lower
-            or "narrator" in name_lower
+            "dadi" in name_lower
             or "grandmother" in name_lower
+            or "grandma" in name_lower
         ):
+            return "ishita"
+        elif "ajji" in name_lower or "narrator" in name_lower:
             return "shubh"
         elif "punyakoti" in name_lower or "cow" in name_lower:
             return "priya"
         elif "arbhuta" in name_lower or "tiger" in name_lower:
             return "aditya"
-        elif "crow" in name_lower:
+        elif "crow" in name_lower or "kauva" in name_lower:
             return "neha"
         elif "fox" in name_lower:
             return "aditya"
@@ -198,7 +207,7 @@ class BulbulService:
         elif "child" in name_lower:
             return "kavya"
         elif "elder" in name_lower or "king" in name_lower or "teacher" in name_lower:
-            return "shubh"
+            return "ishita"
         elif "villain" in name_lower or "monster" in name_lower:
             return "rahul"
         else:

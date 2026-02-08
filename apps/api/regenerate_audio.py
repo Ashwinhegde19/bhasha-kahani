@@ -26,19 +26,44 @@ cache_service = CacheService()
 r2_service = R2Service()
 
 
-async def clear_all_audio():
-    """Clear all audio files from database and cache"""
+async def clear_story_audio(story_slug: str = None):
+    """Clear audio files for a specific story (or all if no slug given)"""
     async with AsyncSessionLocal() as db:
-        # Delete all audio files
-        result = await db.execute(delete(AudioFile))
-        await db.commit()
-        print(f"Deleted {result.rowcount} audio files from database")
+        if story_slug:
+            # Only delete audio for nodes belonging to this story
+            result = await db.execute(select(Story).where(Story.slug == story_slug))
+            story = result.scalar_one_or_none()
+            if not story:
+                print(f"Story '{story_slug}' not found, nothing to clear")
+                return
+            node_ids_result = await db.execute(
+                select(StoryNode.id).where(StoryNode.story_id == story.id)
+            )
+            node_ids = [row[0] for row in node_ids_result.all()]
+            if node_ids:
+                result = await db.execute(
+                    delete(AudioFile).where(AudioFile.node_id.in_(node_ids))
+                )
+                await db.commit()
+                print(f"Deleted {result.rowcount} audio files for '{story_slug}'")
+            else:
+                print(f"No nodes found for '{story_slug}'")
+        else:
+            # Delete all audio files
+            result = await db.execute(delete(AudioFile))
+            await db.commit()
+            print(f"Deleted {result.rowcount} audio files from database")
 
-        # Clear Redis cache
+        # Clear Redis audio cache keys
         try:
-            r = await cache_service.connect()
-            await r.flushdb()
-            print("Cleared Redis cache")
+            import redis.asyncio as aioredis
+
+            r = aioredis.from_url("redis://localhost:6379")
+            keys = await r.keys("audio:*")
+            if keys:
+                await r.delete(*keys)
+            print(f"Cleared {len(keys)} Redis audio cache keys")
+            await r.aclose()
         except Exception as e:
             print(f"Warning: Could not clear Redis cache: {e}")
 
@@ -151,8 +176,8 @@ async def main():
     parser.add_argument("--language", default="en", help="Language code (en, hi, kn)")
     args = parser.parse_args()
 
-    print("Clearing all existing audio...")
-    await clear_all_audio()
+    print(f"Clearing audio for {args.story}...")
+    await clear_story_audio(args.story)
 
     if not args.clear_only:
         print(f"\nRegenerating audio for {args.story}...")
