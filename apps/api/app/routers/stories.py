@@ -93,45 +93,6 @@ async def list_stories(
         },
     )
 
-    if age_range:
-        query = query.where(Story.age_range == age_range)
-
-    result = await db.execute(query)
-    rows = result.all()
-
-    stories = []
-    for story, translation in rows:
-        stories.append(
-            StoryResponse(
-                id=story.id,
-                slug=story.slug,
-                title=translation.title,
-                description=translation.description or "",
-                language=language,
-                age_range=story.age_range,
-                region=story.region,
-                moral=story.moral,
-                duration_min=story.duration_min or 0,
-                cover_image=story.cover_image or "",
-                character_count=0,  # TODO: Fix async relationship loading
-                choice_count=0,
-                is_completed_translation=translation.is_complete,
-                created_at=story.created_at,
-            )
-        )
-
-    return StoryListResponse(
-        data=stories,
-        pagination={
-            "page": 1,
-            "limit": len(stories),
-            "total": len(stories),
-            "total_pages": 1,
-            "has_next": False,
-            "has_prev": False,
-        },
-    )
-
 
 @router.get("/{slug}", response_model=StoryDetailResponse)
 async def get_story(

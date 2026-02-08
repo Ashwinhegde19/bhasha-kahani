@@ -3,9 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Clock, Filter, Users } from 'lucide-react';
+import { BookOpen, Clock, Filter, Users, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -19,12 +18,24 @@ import { api } from '@/lib/api';
 import { Story } from '@/types';
 import { AGE_RANGES } from '@/lib/constants';
 
-function StoryCard({ story }: { story: Story }) {
+// Rotating card gradient backgrounds
+const CARD_GRADIENTS = [
+  'from-amber-200/60 to-orange-200/60',
+  'from-rose-200/60 to-pink-200/60',
+  'from-sky-200/60 to-cyan-200/60',
+  'from-emerald-200/60 to-teal-200/60',
+  'from-violet-200/60 to-purple-200/60',
+  'from-yellow-200/60 to-amber-200/60',
+];
+
+function StoryCard({ story, index }: { story: Story; index: number }) {
+  const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+
   return (
     <Link href={`/stories/${story.slug}`}>
-      <Card className="h-full overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 cursor-pointer group">
-        {/* Cover Image Placeholder */}
-        <div className="relative aspect-[4/3] bg-gradient-to-br from-primary/20 to-primary/5 overflow-hidden">
+      <div className="h-full rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group">
+        {/* Cover Image Area */}
+        <div className={`relative aspect-[4/3] bg-gradient-to-br ${gradient} overflow-hidden`}>
           {story.cover_image ? (
             <img
               src={story.cover_image}
@@ -33,20 +44,26 @@ function StoryCard({ story }: { story: Story }) {
             />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <BookOpen className="w-16 h-16 text-primary/40" />
+              <BookOpen className="w-16 h-16 text-white/60" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           
           {/* Age Badge */}
-          <Badge className="absolute top-2 left-2 bg-primary/90">
+          <Badge className="absolute top-3 left-3 bg-white/90 text-foreground shadow-sm">
             Ages {story.age_range}
           </Badge>
+
+          {/* Play hint on hover */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+              <Play className="w-6 h-6 text-primary ml-0.5" />
+            </div>
+          </div>
         </div>
 
         {/* Content */}
-        <CardContent className="p-4">
-          <h3 className="font-semibold text-lg mb-1 line-clamp-1 group-hover:text-primary transition-colors">
+        <div className="p-4">
+          <h3 className="font-bold text-lg mb-1 line-clamp-1 group-hover:text-primary transition-colors">
             {story.title}
           </h3>
           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
@@ -64,17 +81,17 @@ function StoryCard({ story }: { story: Story }) {
               {story.character_count} characters
             </span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </Link>
   );
 }
 
 function StoryCardSkeleton() {
   return (
-    <Card className="h-full overflow-hidden">
+    <div className="h-full rounded-2xl overflow-hidden bg-white">
       <Skeleton className="aspect-[4/3]" />
-      <CardContent className="p-4">
+      <div className="p-4">
         <Skeleton className="h-6 w-3/4 mb-2" />
         <Skeleton className="h-4 w-full mb-1" />
         <Skeleton className="h-4 w-2/3 mb-3" />
@@ -82,8 +99,8 @@ function StoryCardSkeleton() {
           <Skeleton className="h-4 w-16" />
           <Skeleton className="h-4 w-20" />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -98,27 +115,25 @@ export default function StoriesPage() {
   const stories = storiesData?.data || [];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-background">
       {/* Header */}
-      <div className="bg-muted/30 border-b">
-        <div className="container mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold mb-2">Explore Stories</h1>
-          <p className="text-muted-foreground">
-            Discover interactive folktales from across India
-          </p>
-        </div>
+      <div className="container mx-auto px-4 pt-6 pb-4">
+        <h1 className="text-3xl md:text-4xl font-bold mb-1">Explore Stories</h1>
+        <p className="text-muted-foreground text-lg">
+          Folktales from across India
+        </p>
       </div>
 
       {/* Filters */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex items-center gap-4">
+      <div className="container mx-auto px-4 pb-4">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Filter className="w-4 h-4" />
-            <span className="text-sm font-medium">Filters:</span>
+            <span className="text-sm font-medium">Age:</span>
           </div>
           
           <Select value={ageRange} onValueChange={setAgeRange}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[160px] bg-white/80 rounded-xl">
               <SelectValue placeholder="All Ages" />
             </SelectTrigger>
             <SelectContent>
@@ -133,7 +148,7 @@ export default function StoriesPage() {
 
           {ageRange !== 'all' && (
             <Button variant="ghost" size="sm" onClick={() => setAgeRange('all')}>
-              Clear filters
+              Clear
             </Button>
           )}
         </div>
@@ -149,8 +164,8 @@ export default function StoriesPage() {
           </div>
         ) : stories.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {stories.map((story) => (
-              <StoryCard key={story.id} story={story} />
+            {stories.map((story, i) => (
+              <StoryCard key={story.id} story={story} index={i} />
             ))}
           </div>
         ) : (

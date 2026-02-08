@@ -11,14 +11,4 @@ export const AGE_RANGES = [
   { value: '11-14', label: 'Ages 11-14' },
 ] as const;
 
-export const REGIONS = [
-  { value: 'pan-indian', label: 'Pan-Indian' },
-  { value: 'bengali', label: 'Bengali' },
-  { value: 'tamil', label: 'Tamil' },
-  { value: 'hindi', label: 'Hindi' },
-] as const;
 
-export const SPEAKERS = [
-  { id: 'meera', name: 'Meera', gender: 'female', style: 'warm_elderly' },
-  { id: 'arvind', name: 'Arvind', gender: 'male', style: 'young_energetic' },
-] as const;
