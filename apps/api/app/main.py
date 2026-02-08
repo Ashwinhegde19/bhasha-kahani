@@ -45,13 +45,38 @@ app.include_router(choices.router, prefix="/choices", tags=["Choices"])
 
 @app.get("/")
 async def root():
-    return {
-        "message": "Bhasha Kahani API",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+    return {"message": "Bhasha Kahani API", "version": "1.0.0", "docs": "/docs"}
 
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/debug/db")
+async def debug_db():
+    """Temporary diagnostic endpoint - remove after deployment is verified"""
+    import traceback
+    from app.database import engine
+
+    results = {"db_url_prefix": str(engine.url)[:30] + "..."}
+    try:
+        from sqlalchemy import text
+
+        async with engine.connect() as conn:
+            row = await conn.execute(text("SELECT 1"))
+            results["db_connection"] = "OK"
+    except Exception as e:
+        results["db_connection"] = "FAILED"
+        results["db_error"] = str(e)
+        results["db_traceback"] = traceback.format_exc()[-500:]
+    try:
+        from app.services.cache_service import CacheService
+
+        cs = CacheService()
+        await cs.set("test", {"ping": "pong"}, ttl=10)
+        val = await cs.get("test")
+        results["redis"] = "OK" if val else "FAILED (no value)"
+    except Exception as e:
+        results["redis"] = f"FAILED: {e}"
+    return results
