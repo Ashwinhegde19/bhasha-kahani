@@ -1,8 +1,7 @@
+// Supported languages from backend
 export const LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'en', name: 'English', flag: '🇬🇧' },
   { code: 'hi', name: 'हिन्दी', flag: '🇮🇳' },
-  { code: 'bn', name: 'বাংলা', flag: '🇧🇩' },
-  { code: 'ta', name: 'தமிழ்', flag: '🇮🇳' },
   { code: 'kn', name: 'ಕನ್ನಡ', flag: '🇮🇳' },
 ] as const;
 
