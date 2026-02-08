@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.pool import NullPool
 from app.config import get_settings
 
 settings = get_settings()
@@ -14,7 +13,11 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=False,
     future=True,
-    poolclass=NullPool if "localhost" in DATABASE_URL else None,
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=1800,  # Recycle connections every 30 min
+    pool_pre_ping=True,  # Verify connections before use
 )
 
 AsyncSessionLocal = async_sessionmaker(

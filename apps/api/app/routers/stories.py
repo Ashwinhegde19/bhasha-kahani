@@ -14,8 +14,10 @@ from app.schemas.story import (
     CharacterResponse,
     ChoiceResponse,
 )
+from app.services.cache_service import CacheService
 
 router = APIRouter()
+cache_service = CacheService()
 
 
 @router.get("", response_model=StoryListResponse)
@@ -25,6 +27,11 @@ async def list_stories(
     db: AsyncSession = Depends(get_db),
 ):
     """List all stories with pagination"""
+    # Check cache first
+    cache_key = f"stories:list:{language}:{age_range or 'all'}"
+    cached = await cache_service.get(cache_key)
+    if cached:
+        return StoryListResponse(**cached)
     # Subquery for character count per story
     char_count_subq = (
         select(Character.story_id, func.count(Character.id).label("char_count"))
@@ -81,7 +88,7 @@ async def list_stories(
             )
         )
 
-    return StoryListResponse(
+    response = StoryListResponse(
         data=stories,
         pagination={
             "page": 1,
@@ -93,6 +100,11 @@ async def list_stories(
         },
     )
 
+    # Cache for 10 minutes
+    await cache_service.set(cache_key, response.model_dump(mode="json"), ttl=600)
+
+    return response
+
 
 @router.get("/{slug}", response_model=StoryDetailResponse)
 async def get_story(
@@ -101,6 +113,12 @@ async def get_story(
     db: AsyncSession = Depends(get_db),
 ):
     """Get story details with nodes and choices"""
+    # Check cache first
+    cache_key = f"stories:detail:{slug}:{language}"
+    cached = await cache_service.get(cache_key)
+    if cached:
+        return StoryDetailResponse(**cached)
+
     # Get story
     result = await db.execute(
         select(Story).where(Story.slug == slug, Story.is_active == True)
@@ -150,6 +168,16 @@ async def get_story(
     result = await db.execute(select(StoryNode).where(StoryNode.story_id == story.id))
     node_rows = result.scalars().all()
 
+    # Get ALL choices for this story in one query (avoid N+1)
+    node_ids = [node.id for node in node_rows]
+    choices_by_node = {}
+    if node_ids:
+        result = await db.execute(
+            select(StoryChoice).where(StoryChoice.node_id.in_(node_ids))
+        )
+        for choice in result.scalars().all():
+            choices_by_node.setdefault(choice.node_id, []).append(choice)
+
     nodes = []
     start_node_id = None
 
@@ -168,13 +196,9 @@ async def get_story(
                     character = char
                     break
 
-        # Get choices for this node directly
-        result = await db.execute(
-            select(StoryChoice).where(StoryChoice.node_id == node.id)
-        )
-        choice_rows = result.scalars().all()
-
+        # Get choices from pre-fetched map
         choices = None
+        choice_rows = choices_by_node.get(node.id, [])
         if node.node_type == "choice" and choice_rows:
             choices = []
             for choice in choice_rows:
@@ -203,7 +227,7 @@ async def get_story(
             )
         )
 
-    return StoryDetailResponse(
+    response = StoryDetailResponse(
         id=story.id,
         slug=story.slug,
         title=translation.title if translation else story.slug,
@@ -221,3 +245,8 @@ async def get_story(
         created_at=story.created_at,
         updated_at=story.updated_at,
     )
+
+    # Cache for 10 minutes
+    await cache_service.set(cache_key, response.model_dump(mode="json"), ttl=600)
+
+    return response
