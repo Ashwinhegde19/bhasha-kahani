@@ -1,12 +1,11 @@
 services:
   - type: web
     name: bhasha-kahani-api
-    runtime: python
-    region: singapore  # Close to India for lower latency
+    runtime: docker
+    region: singapore
     plan: free
     rootDir: apps/api
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
@@ -19,5 +18,3 @@ services:
         sync: false
       - key: SECRET_KEY
         sync: false
-      - key: PYTHON_VERSION
-        value: "3.12.0"
