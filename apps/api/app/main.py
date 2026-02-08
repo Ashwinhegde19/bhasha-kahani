@@ -59,7 +59,24 @@ async def debug_db():
     import traceback
     from app.database import engine
 
-    results = {"db_url_prefix": str(engine.url)[:30] + "..."}
+    import os
+
+    db_url_raw = os.environ.get("DATABASE_URL", "NOT SET")
+    redis_url_raw = os.environ.get("REDIS_URL", "NOT SET")
+    # Show host portion only (mask password)
+    db_host = (
+        db_url_raw.split("@")[-1].split("/")[0] if "@" in db_url_raw else "unknown"
+    )
+    redis_host = (
+        redis_url_raw.split("@")[-1].split("/")[0]
+        if "@" in redis_url_raw
+        else redis_url_raw[:30]
+    )
+    results = {
+        "db_host": db_host,
+        "redis_host": redis_host,
+        "db_url_prefix": str(engine.url)[:30] + "...",
+    }
     try:
         from sqlalchemy import text
 
