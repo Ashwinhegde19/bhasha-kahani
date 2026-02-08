@@ -1,12 +1,45 @@
 import httpx
 import base64
+import re
 from typing import Optional
 from app.config import get_settings
+from pydub import AudioSegment
+import io
 
 settings = get_settings()
 
 # Language code mapping for Bulbul API
 LANGUAGE_CODES = {"en": "en-IN", "hi": "hi-IN", "kn": "kn-IN"}
+
+
+def add_natural_pauses(text: str) -> str:
+    """
+    Add natural conversational pauses to text for more human-like speech.
+    Converts written text to spoken style with breathing room.
+    """
+    # Add slight pause after commas by replacing with comma + ellipsis
+    text = re.sub(r"(?<=[,;])(?!\s*\.\.\.)", "... ", text)
+
+    # Add longer pause at end of sentences
+    text = re.sub(r'(?<=[.!?])(\s+)(?=[A-Z"])', r"...\1", text)
+
+    return text
+
+
+def add_silence_to_audio(audio_bytes: bytes, silence_ms: int = 500) -> bytes:
+    """Add silence at end of audio segment for natural pauses"""
+    try:
+        audio = AudioSegment.from_wav(io.BytesIO(audio_bytes))
+        silence = AudioSegment.silent(duration=silence_ms)
+        audio_with_pause = audio + silence
+
+        buffer = io.BytesIO()
+        audio_with_pause.export(buffer, format="wav")
+        return buffer.getvalue()
+    except Exception as e:
+        print(f"Warning: Could not add silence: {e}")
+        return audio_bytes
+
 
 # IMPROVED: Better voice mappings based on Sarvam characteristics
 # From Sarvam docs - Voice characteristics:
@@ -58,6 +91,7 @@ class BulbulService:
         speaker: str = "shubh",
         code_mix: float = 0.0,
         temperature: float = None,
+        add_pauses: bool = True,
     ) -> Optional[bytes]:
         """
         Generate audio using Sarvam Bulbul API with improved human-like voices
@@ -68,6 +102,7 @@ class BulbulService:
             speaker: Speaker voice ID (character name)
             code_mix: Code mixing ratio (0.0 to 1.0)
             temperature: Voice expressiveness (0.01 to 2.0, default 0.75)
+            add_pauses: Add natural pauses between sentences
 
         Returns:
             Audio bytes or None if failed
@@ -85,6 +120,10 @@ class BulbulService:
         if temperature is None:
             temperature = DEFAULT_TEMPERATURE
 
+        # IMPROVED: Add natural conversational pauses
+        if add_pauses:
+            text = add_natural_pauses(text)
+
         # Build payload according to Sarvam API docs
         # IMPROVED: Added temperature for better expressiveness
         payload = {
@@ -92,40 +131,39 @@ class BulbulService:
             "target_language_code": bulbul_lang,
             "speaker": bulbul_speaker,
             "model": "bulbul:v3",
-            "pace": 1.0,  # Normal pace
+            "pace": 0.95,  # Slightly slower for storytelling
             "speech_sample_rate": "24000",  # Higher quality
             "temperature": temperature,  # More expressive/human-like
-            # Note: WAV format (default) for pydub compatibility
         }
 
         async with httpx.AsyncClient() as client:
             try:
-                print(
-                    f"Bulbul API request: speaker={bulbul_speaker}, lang={bulbul_lang}, temp={temperature}"
-                )
+                print(f"Synthesizing: {speaker} ({bulbul_speaker}), {len(text)} chars")
                 response = await client.post(
                     f"{self.base_url}/text-to-speech",
                     headers=self.headers,
                     json=payload,
                     timeout=60.0,
                 )
-                print(f"Bulbul API response status: {response.status_code}")
                 response.raise_for_status()
 
                 data = response.json()
-                print(f"Bulbul API response: {data.keys()}")
 
                 # Extract audio from base64
                 if "audios" in data and len(data["audios"]) > 0:
                     audio_b64 = data["audios"][0]
-                    return base64.b64decode(audio_b64)
+                    audio_bytes = base64.b64decode(audio_b64)
+
+                    # IMPROVED: Add silence at end for natural pauses between nodes
+                    if add_pauses:
+                        audio_bytes = add_silence_to_audio(audio_bytes, silence_ms=800)
+
+                    return audio_bytes
 
                 return None
 
             except httpx.HTTPError as e:
                 print(f"Bulbul API error: {e}")
-                if hasattr(e, "response") and e.response is not None:
-                    print(f"Response content: {e.response.text}")
                 return None
             except Exception as e:
                 print(f"Unexpected error: {e}")
