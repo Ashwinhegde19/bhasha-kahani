@@ -19,6 +19,80 @@ cache_service = CacheService()
 r2_service = R2Service()
 
 
+@router.post("/story/{story_id}/full")
+async def generate_full_story_audio(
+    story_id: UUID,
+    language: str = Query(..., description="Language code: en, hi, kn"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate full story audio by concatenating all narration nodes"""
+
+    # Get story and nodes
+    story_result = await db.execute(select(Story).where(Story.id == story_id))
+    story = story_result.scalar_one_or_none()
+
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+
+    # Get all narration nodes in order
+    nodes_result = await db.execute(
+        select(StoryNode)
+        .where(StoryNode.story_id == story_id)
+        .where(StoryNode.node_type == "narration")
+        .order_by(StoryNode.display_order)
+    )
+    nodes = nodes_result.scalars().all()
+
+    if not nodes:
+        raise HTTPException(status_code=404, detail="No narration nodes found")
+
+    # Generate audio for each node
+    audio_segments = []
+    total_duration = 0
+
+    for node in nodes:
+        # Use character speaker from node data or default
+        speaker = node.speaker if hasattr(node, "speaker") and node.speaker else "meera"
+
+        # Get text for language
+        text = node.text_content.get(language, node.text_content.get("en", ""))
+        if not text:
+            continue
+
+        # Generate audio
+        audio_bytes = await bulbul_service.synthesize(text, language, speaker)
+        if audio_bytes:
+            audio_segments.append(audio_bytes)
+
+    if not audio_segments:
+        raise HTTPException(
+            status_code=500, detail="Failed to generate any audio segments"
+        )
+
+    # Concatenate all audio segments
+    # For now, just return the first segment as the full audio
+    # In production, you'd use pydub or similar to concatenate MP3s
+    full_audio = b"".join(audio_segments)
+
+    # Upload combined audio
+    combined_url = await r2_service.upload_audio(
+        audio_bytes=full_audio,
+        story_slug=story.slug,
+        node_id="full-story",
+        language=language,
+        speaker="combined",
+    )
+
+    return {
+        "story_id": story_id,
+        "language": language,
+        "audio_url": combined_url,
+        "total_nodes": len(nodes),
+        "total_duration_sec": len(full_audio) / 16000,  # rough estimate
+        "file_size": len(full_audio),
+    }
+
+
 @router.get("/{node_id}", response_model=Union[AudioResponse, AudioGeneratingResponse])
 async def get_audio(
     node_id: UUID,

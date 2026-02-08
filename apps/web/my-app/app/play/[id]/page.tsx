@@ -36,20 +36,14 @@ export default function PlayStoryPage() {
   // Get all narration nodes (not just first)
   const narrationNodes = story?.nodes?.filter((n: any) => n.node_type === 'narration') || [];
   
-  // Get the first node for initial display
-  const firstNode = story?.nodes?.find((n: any) => n.is_start);
-
-  // Get audio for first node
+  // Get full story audio
   const { data: audioData, isLoading: audioLoading } = useQuery({
-    queryKey: ['audio', firstNode?.id, 'en'],
+    queryKey: ['full-story-audio', storyId, 'en'],
     queryFn: () => {
-      if (!firstNode?.id) return null;
-      return api.getAudioUrl(firstNode.id, { 
-        language: 'en', 
-        speaker: firstNode?.character?.bulbul_speaker || 'meera'
-      });
+      if (!storyId) return null;
+      return api.getFullStoryAudio(storyId, 'en');
     },
-    enabled: !!firstNode?.id,
+    enabled: !!storyId,
   });
 
   const playAudio = (url: string, nodeId: string) => {
@@ -164,7 +158,9 @@ export default function PlayStoryPage() {
               </div>
 
               <div className="mt-4 text-sm text-muted-foreground">
-                <p>Status: {audioData.is_cached ? 'Cached' : 'Generated'}</p>
+                <p>Status: Full Story Audio</p>
+                <p>Total Nodes: {audioData.total_nodes}</p>
+                <p>Duration: {Math.round(audioData.total_duration_sec)} seconds</p>
                 <p>File Size: {((audioData.file_size || 0) / 1024).toFixed(1)} KB</p>
               </div>
             </CardContent>
@@ -175,14 +171,20 @@ export default function PlayStoryPage() {
           </div>
         )}
 
-        {firstNode && (
+        {story?.nodes && (
           <Card className="max-w-2xl mx-auto mt-6">
             <CardContent className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Story Text</h2>
-              <p className="text-lg leading-relaxed">{firstNode.text}</p>
-              <p className="text-sm text-muted-foreground mt-4">
-                Character: {firstNode.character?.name}
-              </p>
+              <h2 className="text-lg font-semibold mb-4">Story Nodes ({story.nodes.length})</h2>
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {story.nodes.map((node: any, index: number) => (
+                  <div key={node.id} className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">
+                      Node {index + 1}: {node.character?.name || 'Narrator'}
+                    </p>
+                    <p className="text-sm">{node.text}</p>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}

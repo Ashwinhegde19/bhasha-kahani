@@ -86,6 +86,12 @@ class ApiClient {
     return response.data;
   }
 
+  // Full Story Audio API
+  async getFullStoryAudio(storyId: string, language: string): Promise<{audio_url: string; total_nodes: number; total_duration_sec: number; file_size: number}> {
+    const response = await this.client.post(`/audio/story/${storyId}/full?language=${language}`);
+    return response.data;
+  }
+
   // Choices API
   async makeChoice(
     storySlug: string, 
