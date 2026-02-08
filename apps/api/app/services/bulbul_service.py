@@ -169,6 +169,45 @@ class BulbulService:
                 print(f"Unexpected error: {e}")
                 return None
 
+    def get_speaker_for_character(self, character_name: str) -> str:
+        """Get the appropriate Bulbul speaker voice for a character name"""
+        if not character_name:
+            return "meera"
+
+        name_lower = character_name.lower()
+
+        # Map character names to voices
+        if (
+            "ajji" in name_lower
+            or "narrator" in name_lower
+            or "grandmother" in name_lower
+        ):
+            return "shubh"
+        elif "punyakoti" in name_lower or "cow" in name_lower:
+            return "priya"
+        elif "arbhuta" in name_lower or "tiger" in name_lower:
+            return "aditya"
+        elif "crow" in name_lower:
+            return "neha"
+        elif "fox" in name_lower:
+            return "aditya"
+        elif "hero" in name_lower or "boy" in name_lower or "man" in name_lower:
+            return "aditya"
+        elif "heroine" in name_lower or "girl" in name_lower or "woman" in name_lower:
+            return "priya"
+        elif "child" in name_lower:
+            return "kavya"
+        elif "elder" in name_lower or "king" in name_lower or "teacher" in name_lower:
+            return "shubh"
+        elif "villain" in name_lower or "monster" in name_lower:
+            return "rahul"
+        else:
+            # Default based on common endings
+            if name_lower.endswith("a") or name_lower.endswith("i"):
+                return "priya"
+            else:
+                return "shubh"
+
     async def get_voices(self) -> list:
         """Get available voices with characteristics"""
         return [

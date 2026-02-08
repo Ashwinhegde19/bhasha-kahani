@@ -21,24 +21,23 @@ import { api } from '@/lib/api';
 import { useUserStore } from '@/store';
 import { LANGUAGES } from '@/lib/constants';
 
-// Character avatar background colors
-const CHARACTER_COLORS = [
-  'bg-amber-500',
-  'bg-orange-500',
-  'bg-rose-500',
-  'bg-emerald-500',
-  'bg-sky-500',
-  'bg-violet-500',
-  'bg-pink-500',
-  'bg-teal-500',
-];
-
+// Generate consistent color for character names dynamically
 function getCharacterColor(name: string): string {
+  const colors = [
+    'bg-amber-500',
+    'bg-orange-500',
+    'bg-rose-500',
+    'bg-emerald-500',
+    'bg-sky-500',
+    'bg-violet-500',
+    'bg-pink-500',
+    'bg-teal-500',
+  ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return CHARACTER_COLORS[Math.abs(hash) % CHARACTER_COLORS.length];
+  return colors[Math.abs(hash) % colors.length];
 }
 
 export default function PlayStoryPage() {
