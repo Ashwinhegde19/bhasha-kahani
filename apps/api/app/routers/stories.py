@@ -153,11 +153,18 @@ async def get_story(
 
     characters = []
     for char in char_rows:
+        # Use translated name if available, fallback to DB name
+        translated_name = char.name
+        if char.name_translations and isinstance(char.name_translations, dict):
+            translated_name = char.name_translations.get(
+                language, char.name_translations.get("en", char.name)
+            )
+
         characters.append(
             CharacterResponse(
                 id=char.id,
                 slug=char.slug,
-                name=char.name,
+                name=translated_name,
                 voice_profile=char.voice_profile,
                 bulbul_speaker=char.bulbul_speaker,
                 avatar_url=char.avatar_url,
