@@ -92,6 +92,12 @@ class ApiClient {
     return response.data;
   }
 
+  // Pre-generate all language audios in background
+  async preGenerateAllLanguages(storyId: string): Promise<{message: string; languages: string[]; status: string}> {
+    const response = await this.client.post(`/audio/story/${storyId}/pre-generate`);
+    return response.data;
+  }
+
   // Choices API
   async makeChoice(
     storySlug: string, 

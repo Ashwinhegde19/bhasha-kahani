@@ -40,6 +40,17 @@ export default function PlayStoryPage() {
     enabled: !!storyId,
   });
 
+  // Pre-generate all languages when story loads
+  const { data: pregenData } = useQuery({
+    queryKey: ['pre-generate', storyId],
+    queryFn: () => {
+      if (!storyId) return null;
+      return api.preGenerateAllLanguages(storyId);
+    },
+    enabled: !!storyId,
+    staleTime: Infinity, // Only run once
+  });
+
   // Get full story audio with selected language
   const { data: audioData, isLoading: audioLoading } = useQuery({
     queryKey: ['full-story-audio', storyId, selectedLanguage],
@@ -134,6 +145,11 @@ export default function PlayStoryPage() {
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-5 h-5" />
               <span className="font-medium">Select Language:</span>
+              {pregenData && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  (Preparing {pregenData.languages.length} languages...)
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               {LANGUAGES.filter(lang => story.available_languages?.includes(lang.code)).map((lang) => (
@@ -142,12 +158,20 @@ export default function PlayStoryPage() {
                   variant={selectedLanguage === lang.code ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => handleLanguageChange(lang.code)}
+                  disabled={audioLoading && selectedLanguage === lang.code}
                 >
                   <span className="mr-2">{lang.flag}</span>
                   {lang.name}
+                  {audioLoading && selectedLanguage === lang.code && (
+                    <Loader2 className="w-3 h-3 ml-2 animate-spin" />
+                  )}
                 </Button>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              First time selecting a language may take 30-60 seconds to generate. 
+              After that, it plays instantly!
+            </p>
           </CardContent>
         </Card>
 

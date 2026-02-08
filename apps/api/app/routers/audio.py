@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 import uuid as uuid_module
 from typing import Union
+import io
 
 from app.database import get_db
 from app.models.audio import AudioFile
@@ -12,11 +13,105 @@ from app.schemas.audio import AudioResponse, AudioGeneratingResponse
 from app.services.bulbul_service import BulbulService
 from app.services.cache_service import CacheService
 from app.services.r2_service import R2Service
+from pydub import AudioSegment
 
 router = APIRouter()
 bulbul_service = BulbulService()
 cache_service = CacheService()
 r2_service = R2Service()
+
+
+async def generate_story_audio_for_language(
+    story_id: UUID, language: str, db: AsyncSession
+):
+    """Background task to generate full story audio for a specific language"""
+
+    # Get story and nodes
+    story_result = await db.execute(select(Story).where(Story.id == story_id))
+    story = story_result.scalar_one_or_none()
+
+    if not story:
+        return
+
+    # Get all narration nodes in order
+    nodes_result = await db.execute(
+        select(StoryNode)
+        .where(StoryNode.story_id == story_id)
+        .where(StoryNode.node_type == "narration")
+        .order_by(StoryNode.display_order)
+    )
+    nodes = nodes_result.scalars().all()
+
+    if not nodes:
+        return
+
+    # Generate audio for each node
+    audio_segments = []
+
+    for node in nodes:
+        speaker = node.speaker if hasattr(node, "speaker") and node.speaker else "meera"
+
+        text = node.text_content.get(language, node.text_content.get("en", ""))
+        if not text:
+            continue
+
+        audio_bytes = await bulbul_service.synthesize(text, language, speaker)
+        if audio_bytes:
+            audio_segments.append(audio_bytes)
+
+    if not audio_segments:
+        return
+
+    # Concatenate all audio segments using pydub
+    combined_audio = AudioSegment.empty()
+    for segment_bytes in audio_segments:
+        segment = AudioSegment.from_wav(io.BytesIO(segment_bytes))
+        combined_audio += segment
+
+    # Export as MP3
+    mp3_buffer = io.BytesIO()
+    combined_audio.export(mp3_buffer, format="mp3", bitrate="128k")
+    full_audio = mp3_buffer.getvalue()
+
+    # Upload combined audio
+    await r2_service.upload_audio(
+        audio_bytes=full_audio,
+        story_slug=str(story.slug),
+        node_id="full-story",
+        language=language,
+        speaker="combined",
+    )
+
+
+@router.post("/story/{story_id}/pre-generate")
+async def pre_generate_all_languages(
+    story_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Pre-generate audio for all supported languages in the background"""
+
+    # Get story
+    story_result = await db.execute(select(Story).where(Story.id == story_id))
+    story = story_result.scalar_one_or_none()
+
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+
+    # Queue background generation for all available languages
+    # Get languages from translations
+    languages = ["en", "hi", "kn"]  # Default languages
+    for language in languages:
+        background_tasks.add_task(
+            generate_story_audio_for_language, story_id, language, db
+        )
+
+    return {
+        "story_id": story_id,
+        "message": f"Audio generation started for {len(languages)} languages",
+        "languages": languages,
+        "status": "generating_in_background",
+    }
 
 
 @router.post("/story/{story_id}/full")
@@ -48,18 +143,14 @@ async def generate_full_story_audio(
 
     # Generate audio for each node
     audio_segments = []
-    total_duration = 0
 
     for node in nodes:
-        # Use character speaker from node data or default
         speaker = node.speaker if hasattr(node, "speaker") and node.speaker else "meera"
 
-        # Get text for language
         text = node.text_content.get(language, node.text_content.get("en", ""))
         if not text:
             continue
 
-        # Generate audio
         audio_bytes = await bulbul_service.synthesize(text, language, speaker)
         if audio_bytes:
             audio_segments.append(audio_bytes)
@@ -69,15 +160,21 @@ async def generate_full_story_audio(
             status_code=500, detail="Failed to generate any audio segments"
         )
 
-    # Concatenate all audio segments
-    # For now, just return the first segment as the full audio
-    # In production, you'd use pydub or similar to concatenate MP3s
-    full_audio = b"".join(audio_segments)
+    # Concatenate all audio segments using pydub
+    combined_audio = AudioSegment.empty()
+    for segment_bytes in audio_segments:
+        segment = AudioSegment.from_wav(io.BytesIO(segment_bytes))
+        combined_audio += segment
+
+    # Export as MP3
+    mp3_buffer = io.BytesIO()
+    combined_audio.export(mp3_buffer, format="mp3", bitrate="128k")
+    full_audio = mp3_buffer.getvalue()
 
     # Upload combined audio
     combined_url = await r2_service.upload_audio(
         audio_bytes=full_audio,
-        story_slug=story.slug,
+        story_slug=str(story.slug),
         node_id="full-story",
         language=language,
         speaker="combined",
@@ -88,7 +185,7 @@ async def generate_full_story_audio(
         "language": language,
         "audio_url": combined_url,
         "total_nodes": len(nodes),
-        "total_duration_sec": len(full_audio) / 16000,  # rough estimate
+        "total_duration_sec": len(combined_audio) / 1000,
         "file_size": len(full_audio),
     }
 
@@ -178,7 +275,7 @@ async def get_audio(
     # Upload to R2
     audio_url = await r2_service.upload_audio(
         audio_bytes=audio_bytes,
-        story_slug=story_slug,
+        story_slug=str(story_slug),
         node_id=str(node_id),
         language=language,
         speaker=speaker,
