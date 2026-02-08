@@ -129,9 +129,12 @@ async def generate_full_story_audio(
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
-    # Get all narration nodes in order
+    # Get all narration nodes with character data
+    from sqlalchemy.orm import joinedload
+
     nodes_result = await db.execute(
         select(StoryNode)
+        .options(joinedload(StoryNode.character))
         .where(StoryNode.story_id == story_id)
         .where(StoryNode.node_type == "narration")
         .order_by(StoryNode.display_order)
@@ -141,16 +144,28 @@ async def generate_full_story_audio(
     if not nodes:
         raise HTTPException(status_code=404, detail="No narration nodes found")
 
-    # Generate audio for each node
+    # Generate audio for each node with character-specific voices
     audio_segments = []
 
     for node in nodes:
-        speaker = node.speaker if hasattr(node, "speaker") and node.speaker else "meera"
+        # Get character's voice or default to "meera"
+        speaker = "meera"  # default narrator voice
+        if (
+            node.character
+            and hasattr(node.character, "bulbul_speaker")
+            and node.character.bulbul_speaker
+        ):
+            speaker = node.character.bulbul_speaker
 
+        # Get text for requested language, fallback to English
         text = node.text_content.get(language, node.text_content.get("en", ""))
         if not text:
+            print(f"Warning: No text for node {node.id} in language {language}")
             continue
 
+        print(
+            f"Generating audio for node {node.display_order}: {speaker} voice, {len(text)} chars"
+        )
         audio_bytes = await bulbul_service.synthesize(text, language, speaker)
         if audio_bytes:
             audio_segments.append(audio_bytes)
