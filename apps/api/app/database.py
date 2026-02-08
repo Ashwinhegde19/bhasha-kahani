@@ -12,31 +12,31 @@ if DATABASE_URL.startswith("postgresql://"):
 
 # Detect if using Supabase connection pooler (port 6543 = transaction mode)
 # Transaction mode poolers don't support prepared statements
-is_pooler = ":6543/" in DATABASE_URL or "pooler.supabase.com" in DATABASE_URL
-
-engine_kwargs = dict(
-    echo=False,
-    future=True,
-)
+is_pooler = ":6543" in DATABASE_URL or "pooler.supabase.com" in DATABASE_URL
 
 if is_pooler:
     # Supabase pooler (transaction mode): disable prepared statements, use NullPool
-    # since the external pooler manages connections
-    engine_kwargs.update(
+    # Append prepared_statement_cache_size=0 to the URL for asyncpg
+    separator = "&" if "?" in DATABASE_URL else "?"
+    DATABASE_URL = f"{DATABASE_URL}{separator}prepared_statement_cache_size=0&statement_cache_size=0"
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        future=True,
         poolclass=NullPool,
-        connect_args={"prepared_statement_cache_size": 0, "statement_cache_size": 0},
     )
 else:
     # Direct connection: use SQLAlchemy connection pooling
-    engine_kwargs.update(
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        future=True,
         pool_size=5,
         max_overflow=10,
         pool_timeout=30,
         pool_recycle=1800,
         pool_pre_ping=True,
     )
-
-engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
