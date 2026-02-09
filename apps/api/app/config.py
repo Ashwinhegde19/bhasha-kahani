@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     secret_key: str = "your-super-secret-key-change-this-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     # Audio
     audio_cache_ttl_days: int = 30
