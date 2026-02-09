@@ -42,6 +42,8 @@ app.include_router(stories.router, prefix="/stories", tags=["Stories"])
 app.include_router(audio.router, prefix="/audio", tags=["Audio"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(choices.router, prefix="/choices", tags=["Choices"])
+# Keep canonical story choice route for API-spec compatibility.
+app.include_router(choices.router, prefix="/stories", tags=["Choices"])
 
 
 @app.get("/")
