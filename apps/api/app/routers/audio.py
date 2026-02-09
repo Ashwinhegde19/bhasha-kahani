@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from app.database import get_db, AsyncSessionLocal
 from app.models.audio import AudioFile
-from app.models.story import StoryNode, Story
+from app.models.story import StoryNode, Story, StoryTranslation
 from app.schemas.audio import AudioResponse, AudioGeneratingResponse
 from app.services.bulbul_service import BulbulService
 from app.services.cache_service import CacheService
@@ -104,8 +104,12 @@ async def pre_generate_all_languages(
         raise HTTPException(status_code=404, detail="Story not found")
 
     # Queue background generation for all available languages
-    # Get languages from translations
-    languages = ["en", "hi", "kn"]  # Default languages
+    language_result = await db.execute(
+        select(StoryTranslation.language_code).where(StoryTranslation.story_id == story_id)
+    )
+    languages = sorted(
+        {lang_code for (lang_code,) in language_result.all() if lang_code}
+    ) or ["en"]
     for language in languages:
         background_tasks.add_task(generate_story_audio_for_language, story_id, language)
 
