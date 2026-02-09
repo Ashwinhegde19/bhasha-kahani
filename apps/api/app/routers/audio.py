@@ -130,6 +130,7 @@ async def generate_full_story_audio(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate full story audio by concatenating all narration nodes"""
+    language = language.strip().lower()
 
     # Get story and nodes
     story_result = await db.execute(select(Story).where(Story.id == story_id))
@@ -220,6 +221,8 @@ async def get_audio(
     db: AsyncSession = Depends(get_db),
 ):
     """Get audio URL for a story node"""
+    language = language.strip().lower()
+    speaker = (speaker or "meera").strip().lower() or "meera"
     code_mix_ratio = Decimal(f"{code_mix:.2f}")
 
     # Check cache first
