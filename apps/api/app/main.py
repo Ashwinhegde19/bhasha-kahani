@@ -1,12 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import time
 
-from app.config import get_settings
 from app.routers import auth, stories, audio, users, choices
-
-settings = get_settings()
 
 app = FastAPI(
     title="Bhasha Kahani API",

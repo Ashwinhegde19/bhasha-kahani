@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from datetime import datetime, timedelta
 import jwt
 from uuid import uuid4
@@ -44,7 +43,7 @@ async def create_anonymous_user(db: AsyncSession = Depends(get_db)):
     await db.flush()
 
     # Create access token
-    access_token, expire = create_access_token(
+    access_token, _ = create_access_token(
         data={"sub": str(user.id), "anonymous_id": anonymous_id}
     )
 
