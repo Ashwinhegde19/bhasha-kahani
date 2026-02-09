@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 import uuid as uuid_module
 from typing import Union
@@ -284,7 +286,7 @@ async def get_audio(
 
     if not audio_bytes:
         # Return generating status with all required fields
-        return AudioGeneratingResponse(
+        generating_response = AudioGeneratingResponse(
             node_id=node_id,
             language=language,
             code_mix_ratio=float(code_mix_ratio),
@@ -293,6 +295,10 @@ async def get_audio(
             status="generating",
             estimated_wait_sec=5,
             retry_after=5,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=generating_response.model_dump(mode="json"),
         )
 
     # Get story slug for R2 path
@@ -322,7 +328,41 @@ async def get_audio(
         file_size=len(audio_bytes),
     )
     db.add(new_audio)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Another request wrote the same audio variant first; return canonical row.
+        await db.rollback()
+        existing_result = await db.execute(
+            select(AudioFile).where(
+                AudioFile.node_id == node_id,
+                AudioFile.language_code == language,
+                AudioFile.speaker_id == speaker,
+                AudioFile.code_mix_ratio == code_mix_ratio,
+            )
+        )
+        existing_audio = existing_result.scalar_one_or_none()
+        if existing_audio:
+            await cache_service.set_audio_url(
+                str(node_id),
+                language,
+                speaker,
+                existing_audio.r2_url,
+                float(existing_audio.code_mix_ratio or 0.0),
+            )
+            return AudioResponse(
+                node_id=node_id,
+                language=language,
+                code_mix_ratio=float(existing_audio.code_mix_ratio or 0.0),
+                speaker=speaker,
+                audio_url=existing_audio.r2_url,
+                duration_sec=float(existing_audio.duration_sec)
+                if existing_audio.duration_sec
+                else None,
+                file_size=existing_audio.file_size,
+                is_cached=True,
+            )
+        raise HTTPException(status_code=500, detail="Failed to persist generated audio")
 
     # Cache
     await cache_service.set_audio_url(
