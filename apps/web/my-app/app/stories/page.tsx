@@ -18,6 +18,7 @@ import {
 import { api } from '@/lib/api';
 import { Story } from '@/types';
 import { AGE_RANGES } from '@/lib/constants';
+import { useUserStore } from '@/store';
 
 // Rotating card gradient backgrounds
 const CARD_GRADIENTS = [
@@ -109,10 +110,17 @@ function StoryCardSkeleton() {
 
 export default function StoriesPage() {
   const [ageRange, setAgeRange] = useState<string>('all');
+  const { language: selectedLanguage } = useUserStore();
   
   const { data: storiesData, isLoading } = useQuery({
-    queryKey: ['stories', { age_range: ageRange }],
-    queryFn: () => api.listStories({ age_range: ageRange === 'all' ? undefined : ageRange }),
+    queryKey: ['stories', { language: selectedLanguage, age_range: ageRange }],
+    queryFn: () =>
+      api.listStories({
+        language: selectedLanguage,
+        age_range: ageRange === 'all' ? undefined : ageRange,
+      }),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const stories = storiesData?.data || [];
