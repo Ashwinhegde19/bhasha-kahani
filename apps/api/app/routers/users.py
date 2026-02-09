@@ -145,11 +145,8 @@ async def update_progress(
     completion_percentage = min(
         100.0, max(0.0, (current_node.display_order / max_order) * 100.0)
     )
-    progress.completion_percentage = completion_percentage
-
-    if is_completed:
-        progress.is_completed = True
-        progress.completion_percentage = 100.0
+    progress.is_completed = bool(progress.is_completed or is_completed or current_node.is_end)
+    progress.completion_percentage = 100.0 if progress.is_completed else completion_percentage
     
     await db.flush()
     

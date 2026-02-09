@@ -117,7 +117,8 @@ async def make_choice(
             )
             db.add(progress)
 
-        choices_made = progress.choices_made or []
+        # Use a new list instance so SQLAlchemy always detects JSON changes.
+        choices_made = list(progress.choices_made or [])
         choices_made.append(
             {
                 "node_id": str(request.node_id),
