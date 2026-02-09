@@ -1,12 +1,13 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import time
 
 from app.config import get_settings
 from app.routers import auth, stories, audio, users, choices
 
 settings = get_settings()
+allowed_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+allow_credentials = "*" not in allowed_origins
 
 app = FastAPI(
     title="Bhasha Kahani API",
@@ -20,8 +21,8 @@ app = FastAPI(
 # CORS - Allow frontend to call API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
-    allow_credentials=True,
+    allow_origins=allowed_origins or ["http://localhost:3000"],
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -42,6 +43,8 @@ app.include_router(stories.router, prefix="/stories", tags=["Stories"])
 app.include_router(audio.router, prefix="/audio", tags=["Audio"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(choices.router, prefix="/choices", tags=["Choices"])
+# Keep canonical story choice route for API-spec compatibility.
+app.include_router(choices.router, prefix="/stories", tags=["Choices"])
 
 
 @app.get("/")

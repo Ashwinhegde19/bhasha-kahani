@@ -1,14 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from uuid import UUID
 import uuid as uuid_module
 from typing import Union
 import io
+from decimal import Decimal
 
-from app.database import get_db
+from app.database import get_db, AsyncSessionLocal
 from app.models.audio import AudioFile
-from app.models.story import StoryNode, Story
+from app.models.story import StoryNode, Story, StoryTranslation
 from app.schemas.audio import AudioResponse, AudioGeneratingResponse
 from app.services.bulbul_service import BulbulService
 from app.services.cache_service import CacheService
@@ -21,66 +25,78 @@ cache_service = CacheService()
 r2_service = R2Service()
 
 
-async def generate_story_audio_for_language(
-    story_id: UUID, language: str, db: AsyncSession
-):
+async def execute_with_db_guard(db: AsyncSession, statement):
+    try:
+        return await db.execute(statement)
+    except (SQLAlchemyError, OSError) as exc:
+        raise HTTPException(
+            status_code=503, detail="Database unavailable. Please try again."
+        ) from exc
+
+
+async def generate_story_audio_for_language(story_id: UUID, language: str):
     """Background task to generate full story audio for a specific language"""
+    async with AsyncSessionLocal() as db:
+        # Get story and nodes
+        story_result = await db.execute(select(Story).where(Story.id == story_id))
+        story = story_result.scalar_one_or_none()
 
-    # Get story and nodes
-    story_result = await db.execute(select(Story).where(Story.id == story_id))
-    story = story_result.scalar_one_or_none()
+        if not story:
+            return
 
-    if not story:
-        return
+        # Get all narration nodes in order
+        nodes_result = await db.execute(
+            select(StoryNode)
+            .options(joinedload(StoryNode.character))
+            .where(StoryNode.story_id == story_id)
+            .where(StoryNode.node_type == "narration")
+            .order_by(StoryNode.display_order)
+        )
+        nodes = nodes_result.scalars().all()
 
-    # Get all narration nodes in order
-    nodes_result = await db.execute(
-        select(StoryNode)
-        .where(StoryNode.story_id == story_id)
-        .where(StoryNode.node_type == "narration")
-        .order_by(StoryNode.display_order)
-    )
-    nodes = nodes_result.scalars().all()
+        if not nodes:
+            return
 
-    if not nodes:
-        return
+        # Generate audio for each node
+        audio_segments = []
 
-    # Generate audio for each node
-    audio_segments = []
+        for node in nodes:
+            speaker = (
+                node.character.bulbul_speaker
+                if node.character and node.character.bulbul_speaker
+                else "meera"
+            )
 
-    for node in nodes:
-        speaker = node.speaker if hasattr(node, "speaker") and node.speaker else "meera"
+            text = node.text_content.get(language, node.text_content.get("en", ""))
+            if not text:
+                continue
 
-        text = node.text_content.get(language, node.text_content.get("en", ""))
-        if not text:
-            continue
+            audio_bytes = await bulbul_service.synthesize(text, language, speaker)
+            if audio_bytes:
+                audio_segments.append(audio_bytes)
 
-        audio_bytes = await bulbul_service.synthesize(text, language, speaker)
-        if audio_bytes:
-            audio_segments.append(audio_bytes)
+        if not audio_segments:
+            return
 
-    if not audio_segments:
-        return
+        # Concatenate all audio segments using pydub
+        combined_audio = AudioSegment.empty()
+        for segment_bytes in audio_segments:
+            segment = AudioSegment.from_wav(io.BytesIO(segment_bytes))
+            combined_audio += segment
 
-    # Concatenate all audio segments using pydub
-    combined_audio = AudioSegment.empty()
-    for segment_bytes in audio_segments:
-        segment = AudioSegment.from_wav(io.BytesIO(segment_bytes))
-        combined_audio += segment
+        # Export as MP3
+        mp3_buffer = io.BytesIO()
+        combined_audio.export(mp3_buffer, format="mp3", bitrate="128k")
+        full_audio = mp3_buffer.getvalue()
 
-    # Export as MP3
-    mp3_buffer = io.BytesIO()
-    combined_audio.export(mp3_buffer, format="mp3", bitrate="128k")
-    full_audio = mp3_buffer.getvalue()
-
-    # Upload combined audio
-    await r2_service.upload_audio(
-        audio_bytes=full_audio,
-        story_slug=str(story.slug),
-        node_id="full-story",
-        language=language,
-        speaker="combined",
-    )
+        # Upload combined audio
+        await r2_service.upload_audio(
+            audio_bytes=full_audio,
+            story_slug=str(story.slug),
+            node_id="full-story",
+            language=language,
+            speaker="combined",
+        )
 
 
 @router.post("/story/{story_id}/pre-generate")
@@ -92,19 +108,22 @@ async def pre_generate_all_languages(
     """Pre-generate audio for all supported languages in the background"""
 
     # Get story
-    story_result = await db.execute(select(Story).where(Story.id == story_id))
+    story_result = await execute_with_db_guard(db, select(Story).where(Story.id == story_id))
     story = story_result.scalar_one_or_none()
 
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
     # Queue background generation for all available languages
-    # Get languages from translations
-    languages = ["en", "hi", "kn"]  # Default languages
+    language_result = await execute_with_db_guard(
+        db,
+        select(StoryTranslation.language_code).where(StoryTranslation.story_id == story_id)
+    )
+    languages = sorted(
+        {lang_code for (lang_code,) in language_result.all() if lang_code}
+    ) or ["en"]
     for language in languages:
-        background_tasks.add_task(
-            generate_story_audio_for_language, story_id, language, db
-        )
+        background_tasks.add_task(generate_story_audio_for_language, story_id, language)
 
     return {
         "story_id": story_id,
@@ -121,18 +140,19 @@ async def generate_full_story_audio(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate full story audio by concatenating all narration nodes"""
+    language = language.strip().lower()
 
     # Get story and nodes
-    story_result = await db.execute(select(Story).where(Story.id == story_id))
+    story_result = await execute_with_db_guard(
+        db, select(Story).where(Story.id == story_id)
+    )
     story = story_result.scalar_one_or_none()
 
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
-    # Get all narration nodes with character data
-    from sqlalchemy.orm import joinedload
-
-    nodes_result = await db.execute(
+    nodes_result = await execute_with_db_guard(
+        db,
         select(StoryNode)
         .options(joinedload(StoryNode.character))
         .where(StoryNode.story_id == story_id)
@@ -214,25 +234,32 @@ async def get_audio(
     db: AsyncSession = Depends(get_db),
 ):
     """Get audio URL for a story node"""
+    language = language.strip().lower()
+    speaker = (speaker or "meera").strip().lower() or "meera"
+    code_mix_ratio = Decimal(f"{code_mix:.2f}")
 
     # Check cache first
-    cached_url = await cache_service.get_audio_url(str(node_id), language, speaker)
+    cached_url = await cache_service.get_audio_url(
+        str(node_id), language, speaker, float(code_mix_ratio)
+    )
     if cached_url:
         return AudioResponse(
             node_id=node_id,
             language=language,
-            code_mix_ratio=code_mix,
+            code_mix_ratio=float(code_mix_ratio),
             speaker=speaker,
             audio_url=cached_url,
             is_cached=True,
         )
 
     # Check database
-    result = await db.execute(
+    result = await execute_with_db_guard(
+        db,
         select(AudioFile).where(
             AudioFile.node_id == node_id,
             AudioFile.language_code == language,
             AudioFile.speaker_id == speaker,
+            AudioFile.code_mix_ratio == code_mix_ratio,
         )
     )
     audio_file = result.scalar_one_or_none()
@@ -240,12 +267,16 @@ async def get_audio(
     if audio_file:
         # Cache and return
         await cache_service.set_audio_url(
-            str(node_id), language, speaker, audio_file.r2_url
+            str(node_id),
+            language,
+            speaker,
+            audio_file.r2_url,
+            float(audio_file.code_mix_ratio or 0.0),
         )
         return AudioResponse(
             node_id=node_id,
             language=language,
-            code_mix_ratio=code_mix,
+            code_mix_ratio=float(audio_file.code_mix_ratio or 0.0),
             speaker=speaker,
             audio_url=audio_file.r2_url,
             duration_sec=float(audio_file.duration_sec)
@@ -256,7 +287,9 @@ async def get_audio(
         )
 
     # Get node text
-    result = await db.execute(select(StoryNode).where(StoryNode.id == node_id))
+    result = await execute_with_db_guard(
+        db, select(StoryNode).where(StoryNode.id == node_id)
+    )
     node = result.scalar_one_or_none()
 
     if not node:
@@ -272,19 +305,25 @@ async def get_audio(
 
     if not audio_bytes:
         # Return generating status with all required fields
-        return AudioGeneratingResponse(
+        generating_response = AudioGeneratingResponse(
             node_id=node_id,
             language=language,
-            code_mix_ratio=code_mix,
+            code_mix_ratio=float(code_mix_ratio),
             speaker=speaker,
             audio_url="",
             status="generating",
             estimated_wait_sec=5,
             retry_after=5,
         )
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=generating_response.model_dump(mode="json"),
+        )
 
     # Get story slug for R2 path
-    story_result = await db.execute(select(Story.slug).where(Story.id == node.story_id))
+    story_result = await execute_with_db_guard(
+        db, select(Story.slug).where(Story.id == node.story_id)
+    )
     story_slug = story_result.scalar_one_or_none() or "unknown"
 
     # Upload to R2
@@ -304,21 +343,62 @@ async def get_audio(
     new_audio = AudioFile(
         node_id=node_id,
         language_code=language,
-        code_mix_ratio=code_mix,
+        code_mix_ratio=code_mix_ratio,
         speaker_id=speaker,
         r2_url=audio_url,
         file_size=len(audio_bytes),
     )
     db.add(new_audio)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Another request wrote the same audio variant first; return canonical row.
+        await db.rollback()
+        existing_result = await execute_with_db_guard(
+            db,
+            select(AudioFile).where(
+                AudioFile.node_id == node_id,
+                AudioFile.language_code == language,
+                AudioFile.speaker_id == speaker,
+                AudioFile.code_mix_ratio == code_mix_ratio,
+            )
+        )
+        existing_audio = existing_result.scalar_one_or_none()
+        if existing_audio:
+            await cache_service.set_audio_url(
+                str(node_id),
+                language,
+                speaker,
+                existing_audio.r2_url,
+                float(existing_audio.code_mix_ratio or 0.0),
+            )
+            return AudioResponse(
+                node_id=node_id,
+                language=language,
+                code_mix_ratio=float(existing_audio.code_mix_ratio or 0.0),
+                speaker=speaker,
+                audio_url=existing_audio.r2_url,
+                duration_sec=float(existing_audio.duration_sec)
+                if existing_audio.duration_sec
+                else None,
+                file_size=existing_audio.file_size,
+                is_cached=True,
+            )
+        raise HTTPException(status_code=500, detail="Failed to persist generated audio")
+    except (SQLAlchemyError, OSError) as exc:
+        raise HTTPException(
+            status_code=503, detail="Database unavailable. Please try again."
+        ) from exc
 
     # Cache
-    await cache_service.set_audio_url(str(node_id), language, speaker, audio_url)
+    await cache_service.set_audio_url(
+        str(node_id), language, speaker, audio_url, float(code_mix_ratio)
+    )
 
     return AudioResponse(
         node_id=node_id,
         language=language,
-        code_mix_ratio=code_mix,
+        code_mix_ratio=float(code_mix_ratio),
         speaker=speaker,
         audio_url=audio_url,
         file_size=len(audio_bytes),

@@ -106,13 +106,24 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# Build if needed
-if [ ! -d ".next" ]; then
-    echo -e "${YELLOW}⚠️  Building frontend...${NC}"
-    npm run build
-fi
+# Frontend mode:
+#   dev  (default): best for local iteration, avoids stale .next artifacts
+#   prod           : performs clean build and starts production server
+FRONTEND_MODE="${FRONTEND_MODE:-dev}"
 
-nohup npm start > /tmp/frontend.log 2>&1 &
+if [ "$FRONTEND_MODE" = "prod" ]; then
+    echo -e "${BLUE}🏗️  FRONTEND_MODE=prod: running clean build...${NC}"
+    rm -rf .next
+    if ! npm run build; then
+        echo -e "${RED}❌ Frontend build failed${NC}"
+        echo -e "${YELLOW}   Check logs: tail -f /tmp/frontend.log${NC}"
+        exit 1
+    fi
+    nohup npm start > /tmp/frontend.log 2>&1 &
+else
+    echo -e "${BLUE}🛠️  FRONTEND_MODE=dev: starting Next.js dev server...${NC}"
+    nohup npm run dev > /tmp/frontend.log 2>&1 &
+fi
 FRONTEND_PID=$!
 
 echo -e "${BLUE}⏳ Waiting for frontend to start...${NC}"
@@ -139,6 +150,7 @@ echo -e "${BLUE}📱 Application URLs:${NC}"
 echo -e "   ${GREEN}• Frontend: http://localhost:3000${NC}"
 echo -e "   ${GREEN}• Backend:  http://localhost:8000${NC}"
 echo -e "   ${GREEN}• API Docs: http://localhost:8000/docs${NC}"
+echo -e "   ${GREEN}• Frontend Mode: ${FRONTEND_MODE}${NC}"
 echo ""
 echo -e "${BLUE}📖 Quick Links:${NC}"
 echo -e "   • Stories: http://localhost:3000/stories"

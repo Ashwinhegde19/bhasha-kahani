@@ -1,6 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { 
-  Story, 
   StoryDetail, 
   StoryFilters, 
   StoryListResponse, 
@@ -103,9 +102,8 @@ class ApiClient {
     storySlug: string, 
     data: MakeChoiceRequest
   ): Promise<MakeChoiceResponse> {
-    // TODO: Backend path should be /stories/{slug}/choices but currently at /choices/{slug}/choices
     const response = await this.client.post<MakeChoiceResponse>(
-      `/choices/${storySlug}/choices`,
+      `/stories/${storySlug}/choices`,
       data
     );
     return response.data;

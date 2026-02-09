@@ -1,38 +1,64 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID
-from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from app.database import get_db
-from app.models.user import User
-from app.models.progress import UserProgress, Bookmark
-from app.models.story import Story
-from app.schemas.user import UserResponse
+from app.models.progress import UserProgress
+from app.models.story import Story, StoryNode, StoryTranslation
 from app.schemas.progress import ProgressResponse, ProgressSummary
+from app.utils.auth import get_optional_user_id
 
 router = APIRouter()
 
 
 @router.get("/progress", response_model=ProgressSummary)
 async def get_user_progress(
-    user_id: UUID,  # In production, get from JWT token
+    user_id: Optional[UUID] = Query(
+        None, description="Backward-compatible user id query param"
+    ),
+    token_user_id: Optional[UUID] = Depends(get_optional_user_id),
+    language: str = Query("en", description="Preferred language for story titles"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get user's story progress"""
+    resolved_user_id = token_user_id or user_id
+    if resolved_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
     result = await db.execute(
         select(UserProgress, Story).join(
             Story, UserProgress.story_id == Story.id
-        ).where(UserProgress.user_id == user_id)
+        ).where(UserProgress.user_id == resolved_user_id)
     )
     rows = result.all()
-    
+
+    story_ids = [story.id for _, story in rows]
+    title_map = {}
+    if story_ids:
+        translation_result = await db.execute(
+            select(StoryTranslation).where(
+                StoryTranslation.story_id.in_(story_ids),
+                StoryTranslation.language_code.in_([language, "en"]),
+            )
+        )
+        for translation in translation_result.scalars().all():
+            existing = title_map.get(translation.story_id)
+            if existing is None or translation.language_code == language:
+                title_map[translation.story_id] = translation.title
+
     progress_list = []
     for progress, story in rows:
         progress_list.append(ProgressResponse(
             story_id=progress.story_id,
             story_slug=story.slug,
-            story_title=story.slug,  # TODO: Get from translation
+            story_title=title_map.get(story.id, story.slug),
             cover_image=story.cover_image or "",
             current_node_id=progress.current_node_id,
             is_completed=progress.is_completed,
@@ -55,18 +81,42 @@ async def get_user_progress(
 
 @router.post("/progress")
 async def update_progress(
-    user_id: UUID,
-    story_id: UUID,
-    current_node_id: UUID,
+    user_id: Optional[UUID] = Query(
+        None, description="Backward-compatible user id query param"
+    ),
+    token_user_id: Optional[UUID] = Depends(get_optional_user_id),
+    story_id: UUID = Query(...),
+    current_node_id: UUID = Query(...),
     is_completed: bool = False,
     time_spent_sec: int = 0,
     db: AsyncSession = Depends(get_db)
 ):
     """Update user progress"""
+    resolved_user_id = token_user_id or user_id
+    if resolved_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
+    story_result = await db.execute(select(Story).where(Story.id == story_id))
+    story = story_result.scalar_one_or_none()
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+
+    node_result = await db.execute(
+        select(StoryNode).where(
+            StoryNode.id == current_node_id, StoryNode.story_id == story_id
+        )
+    )
+    current_node = node_result.scalar_one_or_none()
+    if not current_node:
+        raise HTTPException(status_code=400, detail="Invalid node for story")
+
     # Find or create progress
     result = await db.execute(
         select(UserProgress).where(
-            UserProgress.user_id == user_id,
+            UserProgress.user_id == resolved_user_id,
             UserProgress.story_id == story_id
         )
     )
@@ -74,20 +124,29 @@ async def update_progress(
     
     if not progress:
         progress = UserProgress(
-            user_id=user_id,
+            user_id=resolved_user_id,
             story_id=story_id,
             current_node_id=current_node_id,
-            play_count=1
+            play_count=1,
+            total_time_sec=max(0, time_spent_sec),
+            last_played_at=datetime.now(timezone.utc),
         )
         db.add(progress)
     else:
         progress.current_node_id = current_node_id
         progress.play_count += 1
-        progress.total_time_sec += time_spent_sec
-    
-    if is_completed:
-        progress.is_completed = True
-        progress.completion_percentage = 100.0
+        progress.total_time_sec += max(0, time_spent_sec)
+        progress.last_played_at = datetime.now(timezone.utc)
+
+    max_order_result = await db.execute(
+        select(func.max(StoryNode.display_order)).where(StoryNode.story_id == story_id)
+    )
+    max_order = max_order_result.scalar() or 1
+    completion_percentage = min(
+        100.0, max(0.0, (current_node.display_order / max_order) * 100.0)
+    )
+    progress.is_completed = bool(progress.is_completed or is_completed or current_node.is_end)
+    progress.completion_percentage = 100.0 if progress.is_completed else completion_percentage
     
     await db.flush()
     
