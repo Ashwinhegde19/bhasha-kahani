@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from uuid import UUID
 import uuid as uuid_module
 from typing import Union
 import io
 from decimal import Decimal
 
-from app.database import get_db
+from app.database import get_db, AsyncSessionLocal
 from app.models.audio import AudioFile
 from app.models.story import StoryNode, Story
 from app.schemas.audio import AudioResponse, AudioGeneratingResponse
@@ -22,66 +23,69 @@ cache_service = CacheService()
 r2_service = R2Service()
 
 
-async def generate_story_audio_for_language(
-    story_id: UUID, language: str, db: AsyncSession
-):
+async def generate_story_audio_for_language(story_id: UUID, language: str):
     """Background task to generate full story audio for a specific language"""
+    async with AsyncSessionLocal() as db:
+        # Get story and nodes
+        story_result = await db.execute(select(Story).where(Story.id == story_id))
+        story = story_result.scalar_one_or_none()
 
-    # Get story and nodes
-    story_result = await db.execute(select(Story).where(Story.id == story_id))
-    story = story_result.scalar_one_or_none()
+        if not story:
+            return
 
-    if not story:
-        return
+        # Get all narration nodes in order
+        nodes_result = await db.execute(
+            select(StoryNode)
+            .options(joinedload(StoryNode.character))
+            .where(StoryNode.story_id == story_id)
+            .where(StoryNode.node_type == "narration")
+            .order_by(StoryNode.display_order)
+        )
+        nodes = nodes_result.scalars().all()
 
-    # Get all narration nodes in order
-    nodes_result = await db.execute(
-        select(StoryNode)
-        .where(StoryNode.story_id == story_id)
-        .where(StoryNode.node_type == "narration")
-        .order_by(StoryNode.display_order)
-    )
-    nodes = nodes_result.scalars().all()
+        if not nodes:
+            return
 
-    if not nodes:
-        return
+        # Generate audio for each node
+        audio_segments = []
 
-    # Generate audio for each node
-    audio_segments = []
+        for node in nodes:
+            speaker = (
+                node.character.bulbul_speaker
+                if node.character and node.character.bulbul_speaker
+                else "meera"
+            )
 
-    for node in nodes:
-        speaker = node.speaker if hasattr(node, "speaker") and node.speaker else "meera"
+            text = node.text_content.get(language, node.text_content.get("en", ""))
+            if not text:
+                continue
 
-        text = node.text_content.get(language, node.text_content.get("en", ""))
-        if not text:
-            continue
+            audio_bytes = await bulbul_service.synthesize(text, language, speaker)
+            if audio_bytes:
+                audio_segments.append(audio_bytes)
 
-        audio_bytes = await bulbul_service.synthesize(text, language, speaker)
-        if audio_bytes:
-            audio_segments.append(audio_bytes)
+        if not audio_segments:
+            return
 
-    if not audio_segments:
-        return
+        # Concatenate all audio segments using pydub
+        combined_audio = AudioSegment.empty()
+        for segment_bytes in audio_segments:
+            segment = AudioSegment.from_wav(io.BytesIO(segment_bytes))
+            combined_audio += segment
 
-    # Concatenate all audio segments using pydub
-    combined_audio = AudioSegment.empty()
-    for segment_bytes in audio_segments:
-        segment = AudioSegment.from_wav(io.BytesIO(segment_bytes))
-        combined_audio += segment
+        # Export as MP3
+        mp3_buffer = io.BytesIO()
+        combined_audio.export(mp3_buffer, format="mp3", bitrate="128k")
+        full_audio = mp3_buffer.getvalue()
 
-    # Export as MP3
-    mp3_buffer = io.BytesIO()
-    combined_audio.export(mp3_buffer, format="mp3", bitrate="128k")
-    full_audio = mp3_buffer.getvalue()
-
-    # Upload combined audio
-    await r2_service.upload_audio(
-        audio_bytes=full_audio,
-        story_slug=str(story.slug),
-        node_id="full-story",
-        language=language,
-        speaker="combined",
-    )
+        # Upload combined audio
+        await r2_service.upload_audio(
+            audio_bytes=full_audio,
+            story_slug=str(story.slug),
+            node_id="full-story",
+            language=language,
+            speaker="combined",
+        )
 
 
 @router.post("/story/{story_id}/pre-generate")
@@ -103,9 +107,7 @@ async def pre_generate_all_languages(
     # Get languages from translations
     languages = ["en", "hi", "kn"]  # Default languages
     for language in languages:
-        background_tasks.add_task(
-            generate_story_audio_for_language, story_id, language, db
-        )
+        background_tasks.add_task(generate_story_audio_for_language, story_id, language)
 
     return {
         "story_id": story_id,
@@ -129,9 +131,6 @@ async def generate_full_story_audio(
 
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
-
-    # Get all narration nodes with character data
-    from sqlalchemy.orm import joinedload
 
     nodes_result = await db.execute(
         select(StoryNode)
