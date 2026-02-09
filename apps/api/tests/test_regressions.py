@@ -14,7 +14,7 @@ from app.routers import audio as audio_router
 from app.routers import choices as choices_router
 from app.routers import stories as stories_router
 from app.routers import users as users_router
-from app.database import normalize_database_url
+from app.database import build_pooler_connect_args, normalize_database_url
 from app.schemas.story import MakeChoiceRequest
 
 
@@ -290,6 +290,16 @@ class DatabaseConfigRegressionTests(unittest.TestCase):
             "postgresql+asyncpg://user:pass@host:6543/postgres",
         )
         self.assertEqual(connect_args, {"ssl": "require"})
+
+    def test_build_pooler_connect_args_disables_statement_cache(self):
+        connect_args = build_pooler_connect_args({"ssl": "require"})
+
+        self.assertEqual(connect_args["prepared_statement_cache_size"], 0)
+        self.assertEqual(connect_args["statement_cache_size"], 0)
+        self.assertEqual(connect_args["ssl"], "require")
+        self.assertTrue(callable(connect_args["prepared_statement_name_func"]))
+        prepared_name = connect_args["prepared_statement_name_func"]()
+        self.assertTrue(prepared_name.startswith("__asyncpg_stmt_"))
 
 
 class AudioRegressionTests(unittest.IsolatedAsyncioTestCase):

@@ -1,3 +1,4 @@
+from uuid import uuid4
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -49,6 +50,19 @@ def normalize_database_url(raw_url: str) -> tuple[str, dict]:
     return normalized_url, connect_args
 
 
+def build_pooler_connect_args(extra_connect_args: dict) -> dict:
+    """
+    Build asyncpg options compatible with PgBouncer transaction pooling.
+    """
+    return {
+        "prepared_statement_cache_size": 0,
+        "statement_cache_size": 0,
+        # Prevent statement name collisions across pooled backend sessions.
+        "prepared_statement_name_func": lambda: f"__asyncpg_stmt_{uuid4()}__",
+        **extra_connect_args,
+    }
+
+
 DATABASE_URL, parsed_connect_args = normalize_database_url(settings.database_url)
 
 # Detect if using Supabase connection pooler (port 6543 = transaction mode)
@@ -56,11 +70,7 @@ DATABASE_URL, parsed_connect_args = normalize_database_url(settings.database_url
 is_pooler = ":6543" in DATABASE_URL or "pooler.supabase.com" in DATABASE_URL
 
 if is_pooler:
-    connect_args = {
-        "prepared_statement_cache_size": 0,
-        "statement_cache_size": 0,
-        **parsed_connect_args,
-    }
+    connect_args = build_pooler_connect_args(parsed_connect_args)
     engine = create_async_engine(
         DATABASE_URL,
         echo=False,
