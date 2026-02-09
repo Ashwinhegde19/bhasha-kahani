@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
-from uuid import UUID
+from typing import Optional
 
 from app.database import get_db
 from app.models.story import Story, StoryTranslation, Character, StoryNode, StoryChoice
@@ -18,6 +17,26 @@ from app.services.cache_service import CacheService
 
 router = APIRouter()
 cache_service = CacheService()
+
+
+def parse_age_range(value: Optional[str]) -> Optional[tuple[int, int]]:
+    if not value or "-" not in value:
+        return None
+    low, high = value.split("-", 1)
+    try:
+        return int(low.strip()), int(high.strip())
+    except ValueError:
+        return None
+
+
+def ranges_overlap(a: tuple[int, int], b: tuple[int, int]) -> bool:
+    return a[0] <= b[1] and b[0] <= a[1]
+
+
+def get_localized_text(content: Optional[dict], language: str) -> str:
+    if not isinstance(content, dict):
+        return ""
+    return content.get(language, content.get("en", ""))
 
 
 @router.get("", response_model=StoryListResponse)
@@ -61,14 +80,20 @@ async def list_stories(
         .where(StoryTranslation.language_code == language, Story.is_active == True)
     )
 
-    if age_range:
-        query = query.where(Story.age_range == age_range)
-
     result = await db.execute(query)
     rows = result.all()
+    requested_range = parse_age_range(age_range)
 
     stories = []
     for story, translation, char_count, choice_count in rows:
+        if age_range:
+            story_range = parse_age_range(story.age_range)
+            if requested_range and story_range:
+                if not ranges_overlap(requested_range, story_range):
+                    continue
+            elif story.age_range != age_range:
+                continue
+
         stories.append(
             StoryResponse(
                 id=story.id,
@@ -128,24 +153,18 @@ async def get_story(
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
-    # Get translation
+    # Get all translations once (for fallback + available languages)
     result = await db.execute(
-        select(StoryTranslation).where(
-            StoryTranslation.story_id == story.id,
-            StoryTranslation.language_code == language,
-        )
+        select(StoryTranslation).where(StoryTranslation.story_id == story.id)
     )
-    translation = result.scalar_one_or_none()
+    translations = result.scalars().all()
+    translations_by_lang = {t.language_code: t for t in translations}
+    translation = translations_by_lang.get(language) or translations_by_lang.get("en")
+    selected_language = translation.language_code if translation else language
+    available_languages = sorted(translations_by_lang.keys()) or ["en"]
 
     if not translation:
-        # Fallback to English
-        result = await db.execute(
-            select(StoryTranslation).where(
-                StoryTranslation.story_id == story.id,
-                StoryTranslation.language_code == "en",
-            )
-        )
-        translation = result.scalar_one_or_none()
+        raise HTTPException(status_code=404, detail="Story translation not found")
 
     # Get characters directly
     result = await db.execute(select(Character).where(Character.story_id == story.id))
@@ -157,7 +176,7 @@ async def get_story(
         translated_name = char.name
         if char.name_translations and isinstance(char.name_translations, dict):
             translated_name = char.name_translations.get(
-                language, char.name_translations.get("en", char.name)
+                selected_language, char.name_translations.get("en", char.name)
             )
 
         characters.append(
@@ -193,7 +212,7 @@ async def get_story(
             start_node_id = node.id
 
         # Get text for current language
-        text_content = node.text_content.get(language, node.text_content.get("en", ""))
+        text_content = get_localized_text(node.text_content, selected_language)
 
         # Get character for this node
         character = None
@@ -210,7 +229,7 @@ async def get_story(
             choices = []
             for choice in choice_rows:
                 choice_text = choice.text_content.get(
-                    language, choice.text_content.get("en", "")
+                    selected_language, choice.text_content.get("en", "")
                 )
                 choices.append(
                     ChoiceResponse(
@@ -239,13 +258,13 @@ async def get_story(
         slug=story.slug,
         title=translation.title if translation else story.slug,
         description=translation.description if translation else "",
-        language=language,
+        language=selected_language,
         age_range=story.age_range,
         region=story.region,
         moral=story.moral,
         duration_min=story.duration_min or 0,
         cover_image=story.cover_image or "",
-        available_languages=["en", "hi", "kn"],
+        available_languages=available_languages,
         characters=characters,
         nodes=nodes,
         start_node_id=start_node_id,
