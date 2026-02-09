@@ -24,7 +24,11 @@ def parse_age_range(value: Optional[str]) -> Optional[tuple[int, int]]:
         return None
     low, high = value.split("-", 1)
     try:
-        return int(low.strip()), int(high.strip())
+        low_i = int(low.strip())
+        high_i = int(high.strip())
+        if low_i > high_i:
+            low_i, high_i = high_i, low_i
+        return low_i, high_i
     except ValueError:
         return None
 
@@ -46,8 +50,10 @@ async def list_stories(
     db: AsyncSession = Depends(get_db),
 ):
     """List all stories with pagination"""
+    requested_language = (language or "en").strip().lower()
+
     # Check cache first
-    cache_key = f"stories:list:{language}:{age_range or 'all'}"
+    cache_key = f"stories:list:{requested_language}:{age_range or 'all'}"
     cached = await cache_service.get(cache_key)
     if cached:
         return StoryListResponse(**cached)
@@ -66,26 +72,39 @@ async def list_stories(
         .subquery()
     )
 
-    # Get stories with translations and counts
+    # Get active stories with counts
     query = (
         select(
             Story,
-            StoryTranslation,
             char_count_subq.c.char_count,
             choice_count_subq.c.choice_count,
         )
-        .join(StoryTranslation, Story.id == StoryTranslation.story_id)
         .outerjoin(char_count_subq, Story.id == char_count_subq.c.story_id)
         .outerjoin(choice_count_subq, Story.id == choice_count_subq.c.story_id)
-        .where(StoryTranslation.language_code == language, Story.is_active == True)
+        .where(Story.is_active == True)
     )
 
     result = await db.execute(query)
     rows = result.all()
     requested_range = parse_age_range(age_range)
+    story_ids = [story.id for story, _, _ in rows]
+
+    translations_by_story = {}
+    if story_ids:
+        language_codes = sorted({requested_language, "en"})
+        translation_result = await db.execute(
+            select(StoryTranslation).where(
+                StoryTranslation.story_id.in_(story_ids),
+                StoryTranslation.language_code.in_(language_codes),
+            )
+        )
+        for translation in translation_result.scalars().all():
+            existing = translations_by_story.get(translation.story_id)
+            if existing is None or translation.language_code == requested_language:
+                translations_by_story[translation.story_id] = translation
 
     stories = []
-    for story, translation, char_count, choice_count in rows:
+    for story, char_count, choice_count in rows:
         if age_range:
             story_range = parse_age_range(story.age_range)
             if requested_range and story_range:
@@ -94,13 +113,17 @@ async def list_stories(
             elif story.age_range != age_range:
                 continue
 
+        translation = translations_by_story.get(story.id)
+        if not translation:
+            continue
+
         stories.append(
             StoryResponse(
                 id=story.id,
                 slug=story.slug,
                 title=translation.title,
                 description=translation.description or "",
-                language=language,
+                language=translation.language_code,
                 age_range=story.age_range,
                 region=story.region,
                 moral=story.moral,
@@ -138,8 +161,10 @@ async def get_story(
     db: AsyncSession = Depends(get_db),
 ):
     """Get story details with nodes and choices"""
+    requested_language = (language or "en").strip().lower()
+
     # Check cache first
-    cache_key = f"stories:detail:{slug}:{language}"
+    cache_key = f"stories:detail:{slug}:{requested_language}"
     cached = await cache_service.get(cache_key)
     if cached:
         return StoryDetailResponse(**cached)
@@ -159,8 +184,10 @@ async def get_story(
     )
     translations = result.scalars().all()
     translations_by_lang = {t.language_code: t for t in translations}
-    translation = translations_by_lang.get(language) or translations_by_lang.get("en")
-    selected_language = translation.language_code if translation else language
+    translation = (
+        translations_by_lang.get(requested_language) or translations_by_lang.get("en")
+    )
+    selected_language = translation.language_code if translation else requested_language
     available_languages = sorted(translations_by_lang.keys()) or ["en"]
 
     if not translation:
@@ -204,10 +231,14 @@ async def get_story(
         for choice in result.scalars().all():
             choices_by_node.setdefault(choice.node_id, []).append(choice)
 
+    sorted_nodes = sorted(node_rows, key=lambda x: x.display_order)
+    if not sorted_nodes:
+        raise HTTPException(status_code=404, detail="Story has no nodes")
+
     nodes = []
     start_node_id = None
 
-    for node in sorted(node_rows, key=lambda x: x.display_order):
+    for node in sorted_nodes:
         if node.is_start:
             start_node_id = node.id
 
@@ -228,9 +259,7 @@ async def get_story(
         if node.node_type == "choice" and choice_rows:
             choices = []
             for choice in choice_rows:
-                choice_text = choice.text_content.get(
-                    selected_language, choice.text_content.get("en", "")
-                )
+                choice_text = get_localized_text(choice.text_content, selected_language)
                 choices.append(
                     ChoiceResponse(
                         id=choice.id,
@@ -252,6 +281,9 @@ async def get_story(
                 choices=choices,
             )
         )
+
+    if start_node_id is None:
+        start_node_id = sorted_nodes[0].id
 
     response = StoryDetailResponse(
         id=story.id,
