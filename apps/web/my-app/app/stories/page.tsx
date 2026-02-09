@@ -112,7 +112,7 @@ export default function StoriesPage() {
   const [ageRange, setAgeRange] = useState<string>('all');
   const { language: selectedLanguage } = useUserStore();
   
-  const { data: storiesData, isLoading } = useQuery({
+  const { data: storiesData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['stories', { language: selectedLanguage, age_range: ageRange }],
     queryFn: () =>
       api.listStories({
@@ -124,6 +124,17 @@ export default function StoriesPage() {
   });
 
   const stories = storiesData?.data || [];
+  const errorMessage =
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response?: { data?: { detail?: string } } }).response?.data
+      ?.detail === 'string'
+      ? (error as { response?: { data?: { detail?: string } } }).response?.data
+          ?.detail || 'Failed to load stories'
+      : error instanceof Error
+      ? error.message
+      : 'Failed to load stories';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-background">
@@ -172,6 +183,13 @@ export default function StoriesPage() {
             {Array.from({ length: 8 }).map((_, i) => (
               <StoryCardSkeleton key={i} />
             ))}
+          </div>
+        ) : isError ? (
+          <div className="text-center py-16">
+            <BookOpen className="w-16 h-16 mx-auto text-destructive/50 mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Could not load stories</h3>
+            <p className="text-muted-foreground mb-4">{errorMessage}</p>
+            <Button onClick={() => refetch()}>Try again</Button>
           </div>
         ) : stories.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

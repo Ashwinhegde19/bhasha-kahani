@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 from unittest.mock import AsyncMock, patch
 
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
@@ -239,6 +240,23 @@ class StoriesRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.language, "kn")
         self.assertEqual(response.title, "ಮೂರು")
+
+    async def test_list_stories_returns_503_when_database_unavailable(self):
+        class FailingDB:
+            async def execute(self, *args, **kwargs):
+                raise ConnectionRefusedError("db down")
+
+        with patch.object(
+            stories_router.cache_service, "get", new=AsyncMock(return_value=None)
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await stories_router.list_stories(
+                    language="en",
+                    age_range=None,
+                    db=FailingDB(),
+                )
+
+        self.assertEqual(ctx.exception.status_code, 503)
 
 
 class AudioRegressionTests(unittest.IsolatedAsyncioTestCase):

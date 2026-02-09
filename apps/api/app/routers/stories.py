@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional
 
 from app.database import get_db
@@ -51,6 +52,15 @@ def get_localized_text(content: Optional[dict], language: str) -> str:
     return content.get(language, content.get("en", ""))
 
 
+async def execute_with_db_guard(db: AsyncSession, statement):
+    try:
+        return await db.execute(statement)
+    except (SQLAlchemyError, OSError) as exc:
+        raise HTTPException(
+            status_code=503, detail="Database unavailable. Please try again."
+        ) from exc
+
+
 @router.get("", response_model=StoryListResponse)
 async def list_stories(
     language: Optional[str] = Query("en", description="Language code"),
@@ -92,14 +102,15 @@ async def list_stories(
         .where(Story.is_active == True)
     )
 
-    result = await db.execute(query)
+    result = await execute_with_db_guard(db, query)
     rows = result.all()
     requested_range = parse_age_range(age_range)
     story_ids = [story.id for story, _, _ in rows]
 
     translations_by_story = {}
     if story_ids:
-        translation_result = await db.execute(
+        translation_result = await execute_with_db_guard(
+            db,
             select(StoryTranslation).where(
                 StoryTranslation.story_id.in_(story_ids),
             )
@@ -182,7 +193,8 @@ async def get_story(
         return StoryDetailResponse(**cached)
 
     # Get story
-    result = await db.execute(
+    result = await execute_with_db_guard(
+        db,
         select(Story).where(Story.slug == slug, Story.is_active == True)
     )
     story = result.scalar_one_or_none()
@@ -191,7 +203,8 @@ async def get_story(
         raise HTTPException(status_code=404, detail="Story not found")
 
     # Get all translations once (for fallback + available languages)
-    result = await db.execute(
+    result = await execute_with_db_guard(
+        db,
         select(StoryTranslation).where(StoryTranslation.story_id == story.id)
     )
     translations = result.scalars().all()
@@ -208,7 +221,9 @@ async def get_story(
         raise HTTPException(status_code=404, detail="Story translation not found")
 
     # Get characters directly
-    result = await db.execute(select(Character).where(Character.story_id == story.id))
+    result = await execute_with_db_guard(
+        db, select(Character).where(Character.story_id == story.id)
+    )
     char_rows = result.scalars().all()
 
     characters = []
@@ -232,14 +247,17 @@ async def get_story(
         )
 
     # Get nodes directly
-    result = await db.execute(select(StoryNode).where(StoryNode.story_id == story.id))
+    result = await execute_with_db_guard(
+        db, select(StoryNode).where(StoryNode.story_id == story.id)
+    )
     node_rows = result.scalars().all()
 
     # Get ALL choices for this story in one query (avoid N+1)
     node_ids = [node.id for node in node_rows]
     choices_by_node = {}
     if node_ids:
-        result = await db.execute(
+        result = await execute_with_db_guard(
+            db,
             select(StoryChoice).where(StoryChoice.node_id.in_(node_ids))
         )
         for choice in result.scalars().all():
