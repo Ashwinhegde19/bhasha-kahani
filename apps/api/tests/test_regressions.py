@@ -14,6 +14,7 @@ from app.routers import audio as audio_router
 from app.routers import choices as choices_router
 from app.routers import stories as stories_router
 from app.routers import users as users_router
+from app.database import normalize_database_url
 from app.schemas.story import MakeChoiceRequest
 
 
@@ -278,6 +279,19 @@ class StoriesRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.data[0].title, "ಕಥೆ")
 
 
+class DatabaseConfigRegressionTests(unittest.TestCase):
+    def test_normalize_database_url_maps_sslmode_to_connect_args(self):
+        normalized_url, connect_args = normalize_database_url(
+            "postgresql://user:pass@host:6543/postgres?sslmode=require"
+        )
+
+        self.assertEqual(
+            normalized_url,
+            "postgresql+asyncpg://user:pass@host:6543/postgres",
+        )
+        self.assertEqual(connect_args, {"ssl": "require"})
+
+
 class AudioRegressionTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_audio_returns_202_while_generating(self):
         node_id = uuid4()
@@ -364,6 +378,34 @@ class AudioRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.is_cached)
         self.assertEqual(response.audio_url, existing.r2_url)
         db.rollback.assert_awaited_once()
+
+    async def test_get_audio_returns_503_when_database_unavailable(self):
+        class FailingDB:
+            async def execute(self, *args, **kwargs):
+                raise ConnectionRefusedError("db down")
+
+            def add(self, _obj):
+                return None
+
+            async def flush(self):
+                return None
+
+            async def rollback(self):
+                return None
+
+        with patch.object(
+            audio_router.cache_service, "get_audio_url", new=AsyncMock(return_value=None)
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await audio_router.get_audio(
+                    node_id=uuid4(),
+                    language="en",
+                    speaker="meera",
+                    code_mix=0.0,
+                    db=FailingDB(),
+                )
+
+        self.assertEqual(ctx.exception.status_code, 503)
 
 
 class ProgressRegressionTests(unittest.IsolatedAsyncioTestCase):

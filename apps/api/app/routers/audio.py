@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from uuid import UUID
 import uuid as uuid_module
 from typing import Union
@@ -23,6 +23,15 @@ router = APIRouter()
 bulbul_service = BulbulService()
 cache_service = CacheService()
 r2_service = R2Service()
+
+
+async def execute_with_db_guard(db: AsyncSession, statement):
+    try:
+        return await db.execute(statement)
+    except (SQLAlchemyError, OSError) as exc:
+        raise HTTPException(
+            status_code=503, detail="Database unavailable. Please try again."
+        ) from exc
 
 
 async def generate_story_audio_for_language(story_id: UUID, language: str):
@@ -99,14 +108,15 @@ async def pre_generate_all_languages(
     """Pre-generate audio for all supported languages in the background"""
 
     # Get story
-    story_result = await db.execute(select(Story).where(Story.id == story_id))
+    story_result = await execute_with_db_guard(db, select(Story).where(Story.id == story_id))
     story = story_result.scalar_one_or_none()
 
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
     # Queue background generation for all available languages
-    language_result = await db.execute(
+    language_result = await execute_with_db_guard(
+        db,
         select(StoryTranslation.language_code).where(StoryTranslation.story_id == story_id)
     )
     languages = sorted(
@@ -133,13 +143,16 @@ async def generate_full_story_audio(
     language = language.strip().lower()
 
     # Get story and nodes
-    story_result = await db.execute(select(Story).where(Story.id == story_id))
+    story_result = await execute_with_db_guard(
+        db, select(Story).where(Story.id == story_id)
+    )
     story = story_result.scalar_one_or_none()
 
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
-    nodes_result = await db.execute(
+    nodes_result = await execute_with_db_guard(
+        db,
         select(StoryNode)
         .options(joinedload(StoryNode.character))
         .where(StoryNode.story_id == story_id)
@@ -240,7 +253,8 @@ async def get_audio(
         )
 
     # Check database
-    result = await db.execute(
+    result = await execute_with_db_guard(
+        db,
         select(AudioFile).where(
             AudioFile.node_id == node_id,
             AudioFile.language_code == language,
@@ -273,7 +287,9 @@ async def get_audio(
         )
 
     # Get node text
-    result = await db.execute(select(StoryNode).where(StoryNode.id == node_id))
+    result = await execute_with_db_guard(
+        db, select(StoryNode).where(StoryNode.id == node_id)
+    )
     node = result.scalar_one_or_none()
 
     if not node:
@@ -305,7 +321,9 @@ async def get_audio(
         )
 
     # Get story slug for R2 path
-    story_result = await db.execute(select(Story.slug).where(Story.id == node.story_id))
+    story_result = await execute_with_db_guard(
+        db, select(Story.slug).where(Story.id == node.story_id)
+    )
     story_slug = story_result.scalar_one_or_none() or "unknown"
 
     # Upload to R2
@@ -336,7 +354,8 @@ async def get_audio(
     except IntegrityError:
         # Another request wrote the same audio variant first; return canonical row.
         await db.rollback()
-        existing_result = await db.execute(
+        existing_result = await execute_with_db_guard(
+            db,
             select(AudioFile).where(
                 AudioFile.node_id == node_id,
                 AudioFile.language_code == language,
@@ -366,6 +385,10 @@ async def get_audio(
                 is_cached=True,
             )
         raise HTTPException(status_code=500, detail="Failed to persist generated audio")
+    except (SQLAlchemyError, OSError) as exc:
+        raise HTTPException(
+            status_code=503, detail="Database unavailable. Please try again."
+        ) from exc
 
     # Cache
     await cache_service.set_audio_url(

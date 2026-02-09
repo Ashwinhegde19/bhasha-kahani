@@ -1,33 +1,74 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
+
 from app.config import get_settings
 
 settings = get_settings()
 
-# Convert postgresql:// to postgresql+asyncpg://
-DATABASE_URL = settings.database_url
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+def normalize_database_url(raw_url: str) -> tuple[str, dict]:
+    """
+    Convert Postgres URLs into asyncpg-compatible URL/connect args.
+    asyncpg does not accept 'sslmode'; map it to the 'ssl' connect arg.
+    """
+    url = raw_url
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    split_url = urlsplit(url)
+    if not split_url.query:
+        return url, {}
+
+    query_pairs = parse_qsl(split_url.query, keep_blank_values=True)
+    filtered_pairs = []
+    connect_args = {}
+
+    for key, value in query_pairs:
+        if key.lower() == "sslmode":
+            mode = value.strip().lower()
+            if mode in {"disable", "false", "0"}:
+                connect_args["ssl"] = False
+            else:
+                connect_args["ssl"] = "require"
+            continue
+        filtered_pairs.append((key, value))
+
+    normalized_query = urlencode(filtered_pairs)
+    normalized_url = urlunsplit(
+        (
+            split_url.scheme,
+            split_url.netloc,
+            split_url.path,
+            normalized_query,
+            split_url.fragment,
+        )
+    )
+    return normalized_url, connect_args
+
+
+DATABASE_URL, parsed_connect_args = normalize_database_url(settings.database_url)
 
 # Detect if using Supabase connection pooler (port 6543 = transaction mode)
 # Transaction mode poolers don't support prepared statements
 is_pooler = ":6543" in DATABASE_URL or "pooler.supabase.com" in DATABASE_URL
 
 if is_pooler:
-    # Supabase pooler (transaction mode): disable prepared statements, use NullPool
+    connect_args = {
+        "prepared_statement_cache_size": 0,
+        "statement_cache_size": 0,
+        **parsed_connect_args,
+    }
     engine = create_async_engine(
         DATABASE_URL,
         echo=False,
         future=True,
         poolclass=NullPool,
-        connect_args={
-            "prepared_statement_cache_size": 0,
-            "statement_cache_size": 0,
-        },
+        connect_args=connect_args,
     )
 else:
-    # Direct connection: use SQLAlchemy connection pooling
     engine = create_async_engine(
         DATABASE_URL,
         echo=False,
@@ -37,6 +78,7 @@ else:
         pool_timeout=30,
         pool_recycle=1800,
         pool_pre_ping=True,
+        connect_args=parsed_connect_args or None,
     )
 
 AsyncSessionLocal = async_sessionmaker(
