@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -123,7 +123,7 @@ async def make_choice(
             {
                 "node_id": str(request.node_id),
                 "choice_key": request.choice_key,
-                "made_at": datetime.utcnow().isoformat(),
+                "made_at": datetime.now(timezone.utc).isoformat(),
             }
         )
         progress.choices_made = choices_made

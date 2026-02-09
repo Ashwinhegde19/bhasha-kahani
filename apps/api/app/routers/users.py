@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -129,14 +129,14 @@ async def update_progress(
             current_node_id=current_node_id,
             play_count=1,
             total_time_sec=max(0, time_spent_sec),
-            last_played_at=datetime.utcnow(),
+            last_played_at=datetime.now(timezone.utc),
         )
         db.add(progress)
     else:
         progress.current_node_id = current_node_id
         progress.play_count += 1
         progress.total_time_sec += max(0, time_spent_sec)
-        progress.last_played_at = datetime.utcnow()
+        progress.last_played_at = datetime.now(timezone.utc)
 
     max_order_result = await db.execute(
         select(func.max(StoryNode.display_order)).where(StoryNode.story_id == story_id)
