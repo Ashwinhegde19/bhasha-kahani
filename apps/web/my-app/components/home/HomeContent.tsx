@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Globe, Headphones, Languages, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,35 +9,15 @@ import { cn } from '@/lib/utils';
 
 export function HomeContent() {
   const router = useRouter();
-  const { language: storedLanguage, setLanguage } = useUserStore();
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // Ensure component is hydrated before rendering
-  useEffect(() => {
-    setSelectedLanguage(storedLanguage || 'en');
-    setIsHydrated(true);
-  }, [storedLanguage]);
+  const { language: selectedLanguage, setLanguage } = useUserStore();
 
   const handleLanguageSelect = (languageCode: string) => {
-    setSelectedLanguage(languageCode);
     setLanguage(languageCode);
   };
 
   const handleStartExploring = () => {
     router.push('/stories');
   };
-
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 via-orange-50/50 to-background">

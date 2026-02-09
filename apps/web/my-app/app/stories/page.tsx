@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Clock, Filter, Users, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -35,14 +36,16 @@ function StoryCard({ story, index }: { story: Story; index: number }) {
     <Link href={`/stories/${story.slug}`}>
       <div className="h-full rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group">
         {/* Cover Image Area */}
-        <div className={`relative aspect-[4/3] bg-gradient-to-br ${gradient} overflow-hidden`}>
-          {story.cover_image ? (
-            <img
-              src={story.cover_image}
-              alt={story.title}
-              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-            />
-          ) : (
+          <div className={`relative aspect-[4/3] bg-gradient-to-br ${gradient} overflow-hidden`}>
+            {story.cover_image ? (
+              <Image
+                src={story.cover_image}
+                alt={story.title}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                className="object-cover transition-transform group-hover:scale-105"
+              />
+            ) : (
             <div className="flex items-center justify-center h-full">
               <BookOpen className="w-16 h-16 text-white/60" />
             </div>

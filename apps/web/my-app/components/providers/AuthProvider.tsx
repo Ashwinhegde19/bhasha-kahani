@@ -9,7 +9,7 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const { token, user } = useUserStore();
+  const { token } = useUserStore();
 
   useEffect(() => {
     // Set token in API client whenever it changes

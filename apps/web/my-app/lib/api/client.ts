@@ -1,6 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { 
-  Story, 
   StoryDetail, 
   StoryFilters, 
   StoryListResponse, 

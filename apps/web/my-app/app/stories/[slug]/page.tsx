@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowLeft, BookOpen, Clock, Play, Users, Quote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -100,10 +101,12 @@ export default function StoryDetailPage() {
           {/* Cover Image */}
           <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gradient-to-br from-amber-200/60 to-orange-200/60 shadow-lg">
             {story.cover_image ? (
-              <img
+              <Image
                 src={story.cover_image}
                 alt={story.title}
-                className="w-full h-full object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
               />
             ) : (
               <div className="flex items-center justify-center h-full">

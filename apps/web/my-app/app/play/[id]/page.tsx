@@ -13,13 +13,13 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  SkipForward,
   Volume2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useUserStore } from '@/store';
 import { LANGUAGES } from '@/lib/constants';
+import { StoryNode } from '@/types';
 
 // Generate consistent color for character names dynamically
 function getCharacterColor(name: string): string {
@@ -60,7 +60,7 @@ export default function PlayStoryPage() {
     queryKey: ['story-slug', storyId],
     queryFn: async () => {
       const stories = await api.listStories();
-      const basicStory = stories.data.find((s: any) => s.id === storyId);
+      const basicStory = stories.data.find((s) => s.id === storyId);
       return basicStory?.slug || null;
     },
     enabled: !!storyId,
@@ -74,7 +74,8 @@ export default function PlayStoryPage() {
   });
 
   // Get all story nodes (narration type)
-  const narrationNodes = story?.nodes?.filter((n: any) => n.node_type === 'narration') || [];
+  const narrationNodes: StoryNode[] =
+    story?.nodes?.filter((n) => n.node_type === 'narration') ?? [];
   const currentNode = narrationNodes[currentNodeIndex];
   const totalNodes = narrationNodes.length;
 
@@ -323,7 +324,7 @@ export default function PlayStoryPage() {
           {/* Step dots for short stories */}
           {totalNodes <= 20 && (
             <div className="flex items-center gap-0.5 ml-2">
-              {narrationNodes.map((_: any, i: number) => (
+              {narrationNodes.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => {
