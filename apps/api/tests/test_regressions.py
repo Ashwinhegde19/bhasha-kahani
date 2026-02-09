@@ -241,22 +241,41 @@ class StoriesRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.language, "kn")
         self.assertEqual(response.title, "ಮೂರು")
 
-    async def test_list_stories_returns_503_when_database_unavailable(self):
+    async def test_list_stories_uses_fallback_when_database_unavailable(self):
         class FailingDB:
             async def execute(self, *args, **kwargs):
                 raise ConnectionRefusedError("db down")
 
+        fallback_story = {
+            "slug": "fallback-story",
+            "age_range": "4-8",
+            "region": "pan-indian",
+            "moral": "Moral",
+            "duration_min": 3,
+            "cover_image": "",
+            "translations": {
+                "kn": {"title": "ಕಥೆ", "description": "ವಿವರಣೆ"},
+            },
+            "characters": [],
+            "nodes": [],
+        }
+
         with patch.object(
             stories_router.cache_service, "get", new=AsyncMock(return_value=None)
+        ), patch.object(
+            stories_router.cache_service, "set", new=AsyncMock()
+        ), patch.object(
+            stories_router, "load_fallback_stories", return_value=[fallback_story]
         ):
-            with self.assertRaises(HTTPException) as ctx:
-                await stories_router.list_stories(
-                    language="en",
-                    age_range=None,
-                    db=FailingDB(),
-                )
+            response = await stories_router.list_stories(
+                language="kn",
+                age_range=None,
+                db=FailingDB(),
+            )
 
-        self.assertEqual(ctx.exception.status_code, 503)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0].slug, "fallback-story")
+        self.assertEqual(response.data[0].title, "ಕಥೆ")
 
 
 class AudioRegressionTests(unittest.IsolatedAsyncioTestCase):
