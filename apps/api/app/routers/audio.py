@@ -5,6 +5,7 @@ from uuid import UUID
 import uuid as uuid_module
 from typing import Union
 import io
+from decimal import Decimal
 
 from app.database import get_db
 from app.models.audio import AudioFile
@@ -214,14 +215,17 @@ async def get_audio(
     db: AsyncSession = Depends(get_db),
 ):
     """Get audio URL for a story node"""
+    code_mix_ratio = Decimal(f"{code_mix:.2f}")
 
     # Check cache first
-    cached_url = await cache_service.get_audio_url(str(node_id), language, speaker)
+    cached_url = await cache_service.get_audio_url(
+        str(node_id), language, speaker, float(code_mix_ratio)
+    )
     if cached_url:
         return AudioResponse(
             node_id=node_id,
             language=language,
-            code_mix_ratio=code_mix,
+            code_mix_ratio=float(code_mix_ratio),
             speaker=speaker,
             audio_url=cached_url,
             is_cached=True,
@@ -233,6 +237,7 @@ async def get_audio(
             AudioFile.node_id == node_id,
             AudioFile.language_code == language,
             AudioFile.speaker_id == speaker,
+            AudioFile.code_mix_ratio == code_mix_ratio,
         )
     )
     audio_file = result.scalar_one_or_none()
@@ -240,12 +245,16 @@ async def get_audio(
     if audio_file:
         # Cache and return
         await cache_service.set_audio_url(
-            str(node_id), language, speaker, audio_file.r2_url
+            str(node_id),
+            language,
+            speaker,
+            audio_file.r2_url,
+            float(audio_file.code_mix_ratio or 0.0),
         )
         return AudioResponse(
             node_id=node_id,
             language=language,
-            code_mix_ratio=code_mix,
+            code_mix_ratio=float(audio_file.code_mix_ratio or 0.0),
             speaker=speaker,
             audio_url=audio_file.r2_url,
             duration_sec=float(audio_file.duration_sec)
@@ -275,7 +284,7 @@ async def get_audio(
         return AudioGeneratingResponse(
             node_id=node_id,
             language=language,
-            code_mix_ratio=code_mix,
+            code_mix_ratio=float(code_mix_ratio),
             speaker=speaker,
             audio_url="",
             status="generating",
@@ -304,7 +313,7 @@ async def get_audio(
     new_audio = AudioFile(
         node_id=node_id,
         language_code=language,
-        code_mix_ratio=code_mix,
+        code_mix_ratio=code_mix_ratio,
         speaker_id=speaker,
         r2_url=audio_url,
         file_size=len(audio_bytes),
@@ -313,12 +322,14 @@ async def get_audio(
     await db.flush()
 
     # Cache
-    await cache_service.set_audio_url(str(node_id), language, speaker, audio_url)
+    await cache_service.set_audio_url(
+        str(node_id), language, speaker, audio_url, float(code_mix_ratio)
+    )
 
     return AudioResponse(
         node_id=node_id,
         language=language,
-        code_mix_ratio=code_mix,
+        code_mix_ratio=float(code_mix_ratio),
         speaker=speaker,
         audio_url=audio_url,
         file_size=len(audio_bytes),

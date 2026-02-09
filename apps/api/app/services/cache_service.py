@@ -49,12 +49,22 @@ class CacheService:
         except Exception as e:
             print(f"Cache delete error: {e}")
     
-    async def get_audio_url(self, node_id: str, language: str, speaker: str) -> Optional[str]:
-        """Get cached audio URL"""
-        key = f"audio:{node_id}:{language}:{speaker}"
+    async def get_audio_url(
+        self, node_id: str, language: str, speaker: str, code_mix: float = 0.0
+    ) -> Optional[str]:
+        """Get cached audio URL for a specific audio variant."""
+        key = f"audio:{node_id}:{language}:{speaker}:{code_mix:.2f}"
         return await self.get(key)
     
-    async def set_audio_url(self, node_id: str, language: str, speaker: str, url: str, ttl: int = 86400 * 30):
-        """Cache audio URL for 30 days"""
-        key = f"audio:{node_id}:{language}:{speaker}"
+    async def set_audio_url(
+        self,
+        node_id: str,
+        language: str,
+        speaker: str,
+        url: str,
+        code_mix: float = 0.0,
+        ttl: int = 86400 * 30,
+    ):
+        """Cache audio URL for 30 days for a specific audio variant."""
+        key = f"audio:{node_id}:{language}:{speaker}:{code_mix:.2f}"
         await self.set(key, url, ttl)
