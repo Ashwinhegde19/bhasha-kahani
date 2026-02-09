@@ -17,8 +17,9 @@ import {
 } from '@/components/ui/select';
 import { api } from '@/lib/api';
 import { Story } from '@/types';
-import { AGE_RANGES } from '@/lib/constants';
+import { AGE_RANGES, LANGUAGES } from '@/lib/constants';
 import { useUserStore } from '@/store';
+import { cn } from '@/lib/utils';
 
 // Rotating card gradient backgrounds
 const CARD_GRADIENTS = [
@@ -35,31 +36,31 @@ function StoryCard({ story, index }: { story: Story; index: number }) {
 
   return (
     <Link href={`/stories/${story.slug}`}>
-      <div className="h-full rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group">
+      <div className="h-full rounded-2xl overflow-hidden bg-card shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group border border-border/30">
         {/* Cover Image Area */}
-          <div className={`relative aspect-[4/3] bg-gradient-to-br ${gradient} overflow-hidden`}>
-            {story.cover_image ? (
-              <Image
-                src={story.cover_image}
-                alt={story.title}
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
-                className="object-cover transition-transform group-hover:scale-105"
-              />
-            ) : (
+        <div className={`relative aspect-[4/3] bg-gradient-to-br ${gradient} overflow-hidden`}>
+          {story.cover_image ? (
+            <Image
+              src={story.cover_image}
+              alt={story.title}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+              className="object-cover transition-transform group-hover:scale-105"
+            />
+          ) : (
             <div className="flex items-center justify-center h-full">
               <BookOpen className="w-16 h-16 text-white/60" />
             </div>
           )}
-          
+
           {/* Age Badge */}
-          <Badge className="absolute top-3 left-3 bg-white/90 text-foreground shadow-sm">
+          <Badge className="absolute top-3 left-3 bg-white/90 dark:bg-card/90 text-foreground shadow-sm">
             Ages {story.age_range}
           </Badge>
 
           {/* Play hint on hover */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-            <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+            <div className="w-14 h-14 rounded-full bg-white/90 dark:bg-card/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
               <Play className="w-6 h-6 text-primary ml-0.5" />
             </div>
           </div>
@@ -73,7 +74,7 @@ function StoryCard({ story, index }: { story: Story; index: number }) {
           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
             {story.description}
           </p>
-          
+
           {/* Meta */}
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -93,7 +94,7 @@ function StoryCard({ story, index }: { story: Story; index: number }) {
 
 function StoryCardSkeleton() {
   return (
-    <div className="h-full rounded-2xl overflow-hidden bg-white">
+    <div className="h-full rounded-2xl overflow-hidden bg-card border border-border/30">
       <Skeleton className="aspect-[4/3]" />
       <div className="p-4">
         <Skeleton className="h-6 w-3/4 mb-2" />
@@ -110,8 +111,8 @@ function StoryCardSkeleton() {
 
 export default function StoriesPage() {
   const [ageRange, setAgeRange] = useState<string>('all');
-  const { language: selectedLanguage } = useUserStore();
-  
+  const { language: selectedLanguage, setLanguage } = useUserStore();
+
   const { data: storiesData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['stories', { language: selectedLanguage, age_range: ageRange }],
     queryFn: () =>
@@ -137,7 +138,7 @@ export default function StoriesPage() {
       : 'Failed to load stories';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-background">
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-background dark:from-background dark:to-background">
       {/* Header */}
       <div className="container mx-auto px-4 pt-6 pb-4">
         <h1 className="text-3xl md:text-4xl font-bold mb-1">Explore Stories</h1>
@@ -148,14 +149,36 @@ export default function StoriesPage() {
 
       {/* Filters */}
       <div className="container mx-auto px-4 pb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Language Switcher */}
+          <div className="flex items-center gap-1 mr-2">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => setLanguage(lang.code)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer',
+                  selectedLanguage === lang.code
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-card dark:bg-secondary/50 text-muted-foreground hover:text-foreground border border-border/50'
+                )}
+              >
+                <span className="mr-1">{lang.flag}</span>
+                {lang.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="w-px h-6 bg-border/50 hidden sm:block" />
+
+          {/* Age Filter */}
           <div className="flex items-center gap-2 text-muted-foreground">
             <Filter className="w-4 h-4" />
             <span className="text-sm font-medium">Age:</span>
           </div>
-          
+
           <Select value={ageRange} onValueChange={setAgeRange}>
-            <SelectTrigger className="w-[160px] bg-white/80 rounded-xl">
+            <SelectTrigger className="w-[160px] bg-card dark:bg-secondary/50 rounded-xl">
               <SelectValue placeholder="All Ages" />
             </SelectTrigger>
             <SelectContent>

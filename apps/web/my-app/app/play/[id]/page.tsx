@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
@@ -20,6 +20,7 @@ import { api } from '@/lib/api';
 import { useUserStore } from '@/store';
 import { LANGUAGES } from '@/lib/constants';
 import { StoryNode } from '@/types';
+import { cn } from '@/lib/utils';
 
 // Generate consistent color for character names dynamically
 function getCharacterColor(name: string): string {
@@ -42,12 +43,16 @@ function getCharacterColor(name: string): string {
 
 export default function PlayStoryPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const storyId = params.id as string;
+  const slugFromQuery = searchParams.get('slug');
   const queryClient = useQueryClient();
   const [playing, setPlaying] = useState(false);
   const [currentNodeIndex, setCurrentNodeIndex] = useState(0);
   const [hasListenedToLast, setHasListenedToLast] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const usingSpeechRef = useRef(false);
   const autoPlayNextRef = useRef(false);
   const playingNodeIdRef = useRef<string | null>(null);
 
@@ -63,14 +68,15 @@ export default function PlayStoryPage() {
       const basicStory = stories.data.find((s) => s.id === storyId);
       return basicStory?.slug || null;
     },
-    enabled: !!storyId,
+    enabled: !!storyId && !slugFromQuery,
     staleTime: Infinity,
   });
+  const resolvedStorySlug = slugFromQuery || storySlug;
 
   const { data: story, isLoading: storyLoading } = useQuery({
-    queryKey: ['story', storySlug, selectedLanguage],
-    queryFn: () => api.getStory(storySlug!, selectedLanguage),
-    enabled: !!storySlug,
+    queryKey: ['story', resolvedStorySlug, selectedLanguage],
+    queryFn: () => api.getStory(resolvedStorySlug!, selectedLanguage),
+    enabled: !!resolvedStorySlug,
   });
 
   // Get all story nodes (narration type)
@@ -90,6 +96,7 @@ export default function PlayStoryPage() {
       });
     },
     enabled: !!currentNode?.id,
+    retry: false,
   });
 
   // Pre-fetch next node audio
@@ -104,12 +111,19 @@ export default function PlayStoryPage() {
       });
     },
     enabled: !!nextNode?.id && playing,
+    retry: false,
   });
 
   // Play audio
   const playAudio = useCallback((audioUrl: string, nodeId?: string) => {
     // Prevent duplicate play attempts on the same node
     if (nodeId && playingNodeIdRef.current === nodeId) return;
+
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      usingSpeechRef.current = false;
+      speechRef.current = null;
+    }
 
     if (audioRef.current) {
       audioRef.current.pause();
@@ -122,7 +136,7 @@ export default function PlayStoryPage() {
     audio.onended = () => {
       playingNodeIdRef.current = null;
       setPlaying(false);
-      if (autoPlayNextRef.current) {
+      if (autoPlayNextRef.current && currentNodeIndex < narrationNodes.length - 1) {
         setCurrentNodeIndex((prev) => prev + 1);
       } else {
         setHasListenedToLast(true);
@@ -138,37 +152,85 @@ export default function PlayStoryPage() {
     });
     audioRef.current = audio;
     setPlaying(true);
-  }, []);
+  }, [currentNodeIndex, narrationNodes.length]);
 
-  // Auto-play on node change — only triggers when nodeAudio or audioLoading changes,
-  // NOT when playing changes (that was causing the flicker loop)
+  const playFallbackSpeech = useCallback((text: string, nodeId?: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (!text.trim()) return;
+    if (nodeId && playingNodeIdRef.current === nodeId) return;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    window.speechSynthesis.cancel();
+
+    if (nodeId) playingNodeIdRef.current = nodeId;
+    usingSpeechRef.current = true;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang =
+      selectedLanguage === 'hi'
+        ? 'hi-IN'
+        : selectedLanguage === 'kn'
+        ? 'kn-IN'
+        : 'en-IN';
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+
+    utterance.onend = () => {
+      usingSpeechRef.current = false;
+      speechRef.current = null;
+      playingNodeIdRef.current = null;
+      setPlaying(false);
+      if (autoPlayNextRef.current && currentNodeIndex < narrationNodes.length - 1) {
+        setCurrentNodeIndex((prev) => prev + 1);
+      } else {
+        setHasListenedToLast(true);
+      }
+    };
+
+    utterance.onerror = () => {
+      usingSpeechRef.current = false;
+      speechRef.current = null;
+      playingNodeIdRef.current = null;
+      setPlaying(false);
+    };
+
+    speechRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+    setPlaying(true);
+  }, [selectedLanguage, currentNodeIndex, narrationNodes.length]);
+
+  // Auto-play on node change
   useEffect(() => {
-    if (autoPlayNextRef.current && nodeAudio?.audio_url && !audioLoading) {
-      // Small delay to let the UI settle before playing
+    if (autoPlayNextRef.current && !audioLoading) {
       const timer = setTimeout(() => {
-        // Guard: don't auto-play if already playing something
-        if (!audioRef.current || audioRef.current.paused || audioRef.current.ended) {
-          playAudio(nodeAudio.audio_url, currentNode?.id);
+        const isHtmlAudioIdle =
+          !audioRef.current || audioRef.current.paused || audioRef.current.ended;
+        if (isHtmlAudioIdle && !usingSpeechRef.current) {
+          if (nodeAudio?.audio_url) {
+            playAudio(nodeAudio.audio_url, currentNode?.id);
+          } else if (currentNode?.text) {
+            playFallbackSpeech(currentNode.text, currentNode?.id);
+          }
         }
       }, 100);
       return () => clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodeAudio, audioLoading, playAudio]);
-
-  // Clamp index
-  useEffect(() => {
-    if (currentNodeIndex >= narrationNodes.length && narrationNodes.length > 0) {
-      autoPlayNextRef.current = false;
-      setCurrentNodeIndex(narrationNodes.length - 1);
-    }
-  }, [currentNodeIndex, narrationNodes.length]);
+  }, [nodeAudio, audioLoading, playAudio, playFallbackSpeech, currentNode]);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    usingSpeechRef.current = false;
+    speechRef.current = null;
     playingNodeIdRef.current = null;
     setPlaying(false);
     autoPlayNextRef.current = false;
@@ -180,11 +242,25 @@ export default function PlayStoryPage() {
     setCurrentNodeIndex(0);
     stopAudio();
     setHasListenedToLast(false);
-    queryClient.invalidateQueries({ queryKey: ['story', storySlug] });
+    queryClient.invalidateQueries({ queryKey: ['story', resolvedStorySlug] });
     queryClient.invalidateQueries({ queryKey: ['node-audio'] });
   };
 
   const handlePlayPause = () => {
+    if (
+      playing &&
+      usingSpeechRef.current &&
+      typeof window !== 'undefined' &&
+      'speechSynthesis' in window
+    ) {
+      window.speechSynthesis.cancel();
+      usingSpeechRef.current = false;
+      speechRef.current = null;
+      playingNodeIdRef.current = null;
+      setPlaying(false);
+      autoPlayNextRef.current = false;
+      return;
+    }
     if (playing && audioRef.current) {
       audioRef.current.pause();
       playingNodeIdRef.current = null;
@@ -201,10 +277,14 @@ export default function PlayStoryPage() {
       autoPlayNextRef.current = true;
       return;
     }
-    if (!nodeAudio?.audio_url) return;
+    if (!nodeAudio?.audio_url && !currentNode?.text) return;
     autoPlayNextRef.current = true;
-    playingNodeIdRef.current = null; // Clear so playAudio won't skip
-    playAudio(nodeAudio.audio_url, currentNode?.id);
+    playingNodeIdRef.current = null;
+    if (nodeAudio?.audio_url) {
+      playAudio(nodeAudio.audio_url, currentNode?.id);
+    } else if (currentNode?.text) {
+      playFallbackSpeech(currentNode.text, currentNode?.id);
+    }
   };
 
   const goToPrev = () => {
@@ -231,9 +311,9 @@ export default function PlayStoryPage() {
   // --- Loading State ---
   if (storyLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-background dark:via-background dark:to-background flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-white/80 shadow-lg flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-card shadow-lg flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
           <div>
@@ -248,7 +328,7 @@ export default function PlayStoryPage() {
   // --- Not Found ---
   if (!story) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-background dark:via-background dark:to-background flex items-center justify-center">
         <div className="text-center space-y-4 px-6">
           <BookOpen className="w-20 h-20 mx-auto text-primary/30" />
           <h1 className="text-2xl font-bold">Story Not Found</h1>
@@ -261,15 +341,17 @@ export default function PlayStoryPage() {
     );
   }
 
+  const backHref = story.slug ? `/stories/${story.slug}` : '/stories';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50/30 flex flex-col">
-      {/* ─── Top Bar ─── */}
-      <header className="sticky top-0 z-20 backdrop-blur-md bg-white/60 border-b border-amber-100/60">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50/30 dark:from-background dark:via-background dark:to-background flex flex-col">
+      {/* Top Bar */}
+      <header className="sticky top-0 z-20 backdrop-blur-md bg-card/60 dark:bg-card/80 border-b border-border/40">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           {/* Back + Title */}
           <div className="flex items-center gap-2 min-w-0">
             <Link
-              href={`/stories/${story.slug}`}
+              href={backHref}
               className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors shrink-0"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -289,14 +371,12 @@ export default function PlayStoryPage() {
               <button
                 key={lang.code}
                 onClick={() => handleLanguageChange(lang.code)}
-                className={`
-                  px-2.5 py-1 rounded-full text-xs font-semibold transition-all
-                  ${
-                    selectedLanguage === lang.code
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground'
-                  }
-                `}
+                className={cn(
+                  'px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer',
+                  selectedLanguage === lang.code
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-card dark:bg-secondary/50 text-muted-foreground hover:text-foreground'
+                )}
               >
                 <span className="mr-0.5">{lang.flag}</span>
                 {lang.code.toUpperCase()}
@@ -306,7 +386,7 @@ export default function PlayStoryPage() {
         </div>
 
         {/* Progress Bar */}
-        <div className="h-1 bg-amber-100/50">
+        <div className="h-1 bg-muted/50">
           <div
             className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400"
             style={{ width: `${progressPercent}%` }}
@@ -314,7 +394,7 @@ export default function PlayStoryPage() {
         </div>
       </header>
 
-      {/* ─── Main Content ─── */}
+      {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 max-w-2xl mx-auto w-full">
         {/* Part indicator */}
         <div className="flex items-center gap-2 mb-4">
@@ -332,16 +412,14 @@ export default function PlayStoryPage() {
                     setCurrentNodeIndex(i);
                     setHasListenedToLast(false);
                   }}
-                  className={`
-                    rounded-full transition-all duration-300
-                    ${
-                      i === currentNodeIndex
-                        ? 'w-5 h-2 bg-primary'
-                        : i < currentNodeIndex
-                        ? 'w-2 h-2 bg-primary/40'
-                        : 'w-2 h-2 bg-muted-foreground/20'
-                    }
-                  `}
+                  className={cn(
+                    'rounded-full transition-all duration-300',
+                    i === currentNodeIndex
+                      ? 'w-5 h-2 bg-primary'
+                      : i < currentNodeIndex
+                      ? 'w-2 h-2 bg-primary/40'
+                      : 'w-2 h-2 bg-muted-foreground/20'
+                  )}
                   aria-label={`Go to part ${i + 1}`}
                 />
               ))}
@@ -353,14 +431,14 @@ export default function PlayStoryPage() {
         {currentNode?.character && (
           <div className="flex items-center gap-3 mb-5 animate-fade-in">
             <div
-              className={`
-                relative w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md
-                ${getCharacterColor(currentNode.character.name)}
-              `}
+              className={cn(
+                'relative w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md',
+                getCharacterColor(currentNode.character.name)
+              )}
             >
               {currentNode.character.name.charAt(0).toUpperCase()}
               {playing && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white shadow flex items-center justify-center">
+                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-card shadow flex items-center justify-center">
                   <Volume2 className="w-2.5 h-2.5 text-primary animate-pulse" />
                 </span>
               )}
@@ -377,10 +455,10 @@ export default function PlayStoryPage() {
           </div>
         )}
 
-        {/* ─── Story Text Card ─── */}
+        {/* Story Text Card */}
         <div
-          className="w-full bg-white/90 backdrop-blur rounded-2xl shadow-[0_2px_24px_-4px_rgba(0,0,0,0.08)] 
-                     border border-white/60 p-6 sm:p-8 mb-6 min-h-[160px] flex items-center justify-center
+          className="w-full bg-card/90 dark:bg-card backdrop-blur rounded-2xl shadow-lg
+                     border border-border/40 p-6 sm:p-8 mb-6 min-h-[160px] flex items-center justify-center
                      transition-all duration-300"
         >
           {currentNode?.text ? (
@@ -395,14 +473,14 @@ export default function PlayStoryPage() {
           )}
         </div>
 
-        {/* ─── Audio & Navigation Controls ─── */}
+        {/* Audio & Navigation Controls */}
         <div className="flex items-center gap-4 mb-6">
           {/* Previous */}
           <button
             onClick={goToPrev}
             disabled={currentNodeIndex === 0}
-            className="w-11 h-11 rounded-full bg-white/80 shadow-sm border border-white/60 flex items-center justify-center
-                       text-muted-foreground hover:text-foreground hover:bg-white hover:shadow-md
+            className="w-11 h-11 rounded-full bg-card shadow-sm border border-border/40 flex items-center justify-center
+                       text-muted-foreground hover:text-foreground hover:bg-accent hover:shadow-md
                        disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             aria-label="Previous part"
           >
@@ -410,22 +488,15 @@ export default function PlayStoryPage() {
           </button>
 
           {/* Play / Pause / Loading */}
-          {audioLoading ? (
-            <div className="w-16 h-16 rounded-full bg-white shadow-lg border-2 border-primary/20 flex items-center justify-center">
-              <Loader2 className="w-7 h-7 animate-spin text-primary" />
-            </div>
-          ) : nodeAudio?.audio_url ? (
+          {currentNode?.text ? (
             <button
               onClick={handlePlayPause}
-              className={`
-                w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-all
-                active:scale-95 cursor-pointer border-2
-                ${
-                  playing
-                    ? 'bg-primary text-primary-foreground border-primary/30 shadow-primary/20 shadow-xl playing-glow'
-                    : 'bg-white text-primary border-primary/10 hover:shadow-xl hover:border-primary/30'
-                }
-              `}
+              className={cn(
+                'w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer border-2',
+                playing
+                  ? 'bg-primary text-primary-foreground border-primary/30 shadow-xl playing-glow'
+                  : 'bg-card text-primary border-primary/10 hover:shadow-xl hover:border-primary/30'
+              )}
               aria-label={playing ? 'Pause' : 'Play'}
             >
               {playing ? (
@@ -435,7 +506,7 @@ export default function PlayStoryPage() {
               )}
             </button>
           ) : (
-            <div className="w-16 h-16 rounded-full bg-white/60 shadow-lg border-2 border-muted/20 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-card/60 shadow-lg border-2 border-border/20 flex items-center justify-center">
               <Loader2 className="w-7 h-7 animate-spin text-muted-foreground/50" />
             </div>
           )}
@@ -444,8 +515,8 @@ export default function PlayStoryPage() {
           <button
             onClick={goToNext}
             disabled={currentNodeIndex >= totalNodes - 1}
-            className="w-11 h-11 rounded-full bg-white/80 shadow-sm border border-white/60 flex items-center justify-center
-                       text-muted-foreground hover:text-foreground hover:bg-white hover:shadow-md
+            className="w-11 h-11 rounded-full bg-card shadow-sm border border-border/40 flex items-center justify-center
+                       text-muted-foreground hover:text-foreground hover:bg-accent hover:shadow-md
                        disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             aria-label="Next part"
           >
@@ -456,17 +527,19 @@ export default function PlayStoryPage() {
         {/* Playback hint */}
         <p className="text-xs text-muted-foreground/60 font-medium mb-6">
           {audioLoading
-            ? 'Preparing audio...'
+            ? 'Preparing cloud audio... instant voice is available now'
             : playing
             ? 'Now playing — auto-advances to next part'
-            : 'Tap play to listen'}
+            : nodeAudio?.audio_url
+            ? 'Tap play to listen'
+            : 'Tap play for instant voice mode'}
         </p>
 
-        {/* ─── Story Complete ─── */}
+        {/* Story Complete */}
         {isStoryComplete && (
           <div
-            className="w-full bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl shadow-lg 
-                       p-8 text-center border border-amber-200/40 animate-fade-in"
+            className="w-full bg-gradient-to-br from-amber-50 to-orange-50 dark:from-primary/10 dark:to-primary/5
+                       rounded-2xl shadow-lg p-8 text-center border border-border/40 animate-fade-in"
           >
             <div className="text-5xl mb-3">🎉</div>
             <h3 className="text-2xl font-bold text-foreground mb-1">Story Complete!</h3>
@@ -489,7 +562,7 @@ export default function PlayStoryPage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="rounded-full px-6 bg-white/80"
+                className="rounded-full px-6"
                 asChild
               >
                 <Link href="/stories">
@@ -502,7 +575,7 @@ export default function PlayStoryPage() {
         )}
       </main>
 
-      {/* ─── Bottom Safe Area / Mini Player Info ─── */}
+      {/* Bottom Safe Area */}
       <footer className="py-3 text-center">
         <p className="text-[10px] text-muted-foreground/40 font-medium tracking-wide uppercase">
           Bhasha Kahani

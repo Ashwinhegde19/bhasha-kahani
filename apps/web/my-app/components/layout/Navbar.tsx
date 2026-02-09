@@ -17,8 +17,8 @@ export function Navbar() {
   if (pathname.startsWith('/play/')) return null;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-amber-200/40 bg-white/80 backdrop-blur-md">
-      <div className="container flex h-14 items-center">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-card/80 dark:bg-card/60 backdrop-blur-md">
+      <div className="container mx-auto px-4 flex h-14 items-center">
         <Link href="/" className="mr-6 flex items-center gap-2 group">
           <span className="text-2xl" aria-hidden="true">&#128214;</span>
           <span className="hidden font-bold sm:inline-block text-lg">
@@ -37,7 +37,7 @@ export function Navbar() {
                   'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   isActive
                     ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-amber-50 hover:text-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                 )}
               >
                 <item.icon className="h-4 w-4" />
