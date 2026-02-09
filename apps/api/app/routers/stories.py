@@ -19,6 +19,14 @@ router = APIRouter()
 cache_service = CacheService()
 
 
+def translation_priority(language_code: str, requested_language: str) -> int:
+    if language_code == requested_language:
+        return 0
+    if language_code == "en":
+        return 1
+    return 2
+
+
 def parse_age_range(value: Optional[str]) -> Optional[tuple[int, int]]:
     if not value or "-" not in value:
         return None
@@ -53,7 +61,7 @@ async def list_stories(
     requested_language = (language or "en").strip().lower()
 
     # Check cache first
-    cache_key = f"stories:list:{requested_language}:{age_range or 'all'}"
+    cache_key = f"stories:v2:list:{requested_language}:{age_range or 'all'}"
     cached = await cache_service.get(cache_key)
     if cached:
         return StoryListResponse(**cached)
@@ -91,16 +99,20 @@ async def list_stories(
 
     translations_by_story = {}
     if story_ids:
-        language_codes = sorted({requested_language, "en"})
         translation_result = await db.execute(
             select(StoryTranslation).where(
                 StoryTranslation.story_id.in_(story_ids),
-                StoryTranslation.language_code.in_(language_codes),
             )
         )
         for translation in translation_result.scalars().all():
             existing = translations_by_story.get(translation.story_id)
-            if existing is None or translation.language_code == requested_language:
+            if existing is None:
+                translations_by_story[translation.story_id] = translation
+                continue
+
+            if translation_priority(
+                translation.language_code, requested_language
+            ) < translation_priority(existing.language_code, requested_language):
                 translations_by_story[translation.story_id] = translation
 
     stories = []
@@ -164,7 +176,7 @@ async def get_story(
     requested_language = (language or "en").strip().lower()
 
     # Check cache first
-    cache_key = f"stories:detail:{slug}:{requested_language}"
+    cache_key = f"stories:v2:detail:{slug}:{requested_language}"
     cached = await cache_service.get(cache_key)
     if cached:
         return StoryDetailResponse(**cached)
@@ -185,7 +197,9 @@ async def get_story(
     translations = result.scalars().all()
     translations_by_lang = {t.language_code: t for t in translations}
     translation = (
-        translations_by_lang.get(requested_language) or translations_by_lang.get("en")
+        translations_by_lang.get(requested_language)
+        or translations_by_lang.get("en")
+        or (translations[0] if translations else None)
     )
     selected_language = translation.language_code if translation else requested_language
     available_languages = sorted(translations_by_lang.keys()) or ["en"]

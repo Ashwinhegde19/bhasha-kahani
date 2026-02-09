@@ -102,6 +102,44 @@ class StoriesRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.data[0].title, "Story One")
         self.assertEqual(response.data[0].language, "en")
 
+    async def test_list_stories_falls_back_to_any_available_translation(self):
+        story = SimpleNamespace(
+            id=uuid4(),
+            slug="story-kn",
+            age_range="5-8",
+            region="south-india",
+            moral="Be truthful",
+            duration_min=5,
+            cover_image="",
+            created_at=datetime.now(timezone.utc),
+        )
+        kn_translation = SimpleNamespace(
+            story_id=story.id,
+            language_code="kn",
+            title="ಕಥೆ",
+            description="Kannada only",
+            is_complete=True,
+        )
+        db = fake_db(
+            [
+                FakeResult(rows=[(story, 1, 0)]),
+                FakeResult(scalars=[kn_translation]),
+            ]
+        )
+
+        with patch.object(
+            stories_router.cache_service, "get", new=AsyncMock(return_value=None)
+        ), patch.object(stories_router.cache_service, "set", new=AsyncMock()):
+            response = await stories_router.list_stories(
+                language="hi",
+                age_range=None,
+                db=db,
+            )
+
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0].title, "ಕಥೆ")
+        self.assertEqual(response.data[0].language, "kn")
+
     async def test_get_story_uses_first_node_when_start_flag_missing(self):
         story = SimpleNamespace(
             id=uuid4(),
@@ -156,6 +194,51 @@ class StoriesRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.language, "en")
         self.assertEqual(response.start_node_id, first_node.id)
         self.assertEqual(response.nodes[0].id, first_node.id)
+
+    async def test_get_story_falls_back_to_non_english_translation(self):
+        story = SimpleNamespace(
+            id=uuid4(),
+            slug="story-three",
+            age_range="7-10",
+            region="pan-indian",
+            moral="Stay honest",
+            duration_min=4,
+            cover_image="",
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        kn_translation = SimpleNamespace(
+            story_id=story.id,
+            language_code="kn",
+            title="ಮೂರು",
+            description="Kannada fallback",
+        )
+        node = SimpleNamespace(
+            id=uuid4(),
+            node_type="narration",
+            display_order=1,
+            is_start=True,
+            is_end=False,
+            text_content={"kn": "ಪಾಠ", "en": "lesson"},
+            character_id=None,
+        )
+        db = fake_db(
+            [
+                FakeResult(scalar=story),
+                FakeResult(scalars=[kn_translation]),
+                FakeResult(scalars=[]),
+                FakeResult(scalars=[node]),
+                FakeResult(scalars=[]),
+            ]
+        )
+
+        with patch.object(
+            stories_router.cache_service, "get", new=AsyncMock(return_value=None)
+        ), patch.object(stories_router.cache_service, "set", new=AsyncMock()):
+            response = await stories_router.get_story("story-three", language="hi", db=db)
+
+        self.assertEqual(response.language, "kn")
+        self.assertEqual(response.title, "ಮೂರು")
 
 
 class AudioRegressionTests(unittest.IsolatedAsyncioTestCase):
