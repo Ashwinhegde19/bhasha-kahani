@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -41,6 +41,11 @@ export default function StoryDetailPage() {
   });
 
   const [imgError, setImgError] = useState(false);
+
+  // Reset image error when story changes
+  useEffect(() => {
+    setImgError(false);
+  }, [story?.cover_image]);
 
   if (isLoading) {
     return (

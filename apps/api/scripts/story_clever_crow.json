@@ -23,6 +23,7 @@
     {
       "slug": "narrator",
       "name": "Dadi",
+      "name_translations": {"en": "Dadi", "hi": "दादी", "kn": "ಅಜ್ಜಿ"},
       "voice_profile": "warm_elderly",
       "bulbul_speaker": "meera",
       "avatar_url": "https://cdn.bhashakahani.com/characters/dadi.png"
@@ -30,6 +31,7 @@
     {
       "slug": "crow",
       "name": "Kauva",
+      "name_translations": {"en": "Kauva", "hi": "कौआ", "kn": "ಕಾಗೆ"},
       "voice_profile": "young_energetic",
       "bulbul_speaker": "arvind",
       "avatar_url": "https://cdn.bhashakahani.com/characters/crow.png"
@@ -205,7 +207,7 @@
       "is_end": true,
       "text": {
         "en": "And so, the clever crow quenched his thirst. Intelligence and persistence always help solve problems!",
-        "hi": "औस प्रकार, चालाक कौए ने अपनी प्यास बुझाई। बुद्धि और दृढ़ता हमेशा समस्याओं को हल करने में मदद करती है!",
+        "hi": "इस प्रकार, चालाक कौए ने अपनी प्यास बुझाई। बुद्धि और दृढ़ता हमेशा समस्याओं को हल करने में मदद करती है!",
         "kn": "ಹೀಗಾಗಿ, ಚತುರ ಕಾಗೆ ತನ್ನ ದಾಹವನ್ನು ತಣಿಸಿಕೊಂಡಿತು. ಬುದ್ಧಿವಂತಿಕೆ ಮತ್ತು ದೃಢತೆ ಯಾವಾಗಲೂ ಸಮಸ್ಯೆಗಳನ್ನು ಪರಿಹರಿಸಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ!"
       }
     }

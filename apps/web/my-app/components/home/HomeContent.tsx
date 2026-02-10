@@ -101,7 +101,7 @@ export function HomeContent() {
           <div className="text-center animate-slide-in-up" style={{ animationDelay: '0.6s' }}>
             <Button
               size="lg"
-              className="sparkle-button px-10 py-7 text-xl rounded-full shadow-lg hover:shadow-xl transition-all animate-heartbeat bg-gradient-to-r from-primary to-rose-500 hover:from-primary/90 hover:to-rose-500/90 text-white border-0 animate-gradient"
+              className="sparkle-button px-10 py-7 text-xl rounded-full shadow-lg hover:shadow-xl transition-all animate-heartbeat bg-gradient-to-r from-primary to-rose-500 hover:from-primary/90 hover:to-rose-500/90 text-white border-0"
               onClick={handleStartExploring}
             >
               Start Exploring

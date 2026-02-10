@@ -304,20 +304,9 @@ async def get_audio(
     audio_bytes = await bulbul_service.synthesize(text, language, speaker, code_mix)
 
     if not audio_bytes:
-        # Return generating status with all required fields
-        generating_response = AudioGeneratingResponse(
-            node_id=node_id,
-            language=language,
-            code_mix_ratio=float(code_mix_ratio),
-            speaker=speaker,
-            audio_url="",
-            status="generating",
-            estimated_wait_sec=5,
-            retry_after=5,
-        )
-        return JSONResponse(
-            status_code=status.HTTP_202_ACCEPTED,
-            content=generating_response.model_dump(mode="json"),
+        raise HTTPException(
+            status_code=503,
+            detail="Audio synthesis unavailable. Use browser speech as fallback.",
         )
 
     # Get story slug for R2 path
@@ -336,8 +325,12 @@ async def get_audio(
     )
 
     if not audio_url:
-        # Fallback to placeholder if R2 upload fails
-        audio_url = f"https://audio.bhashakahani.com/{language}/generated/{uuid_module.uuid4()}.mp3"
+        # Storage not configured — return audio info without persisting
+        # Frontend will use browser speech fallback on next request
+        raise HTTPException(
+            status_code=503,
+            detail="Audio storage unavailable. Use browser speech as fallback.",
+        )
 
     # Save to database
     new_audio = AudioFile(
