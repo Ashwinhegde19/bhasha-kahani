@@ -54,8 +54,8 @@ async def regenerate_all_audio(story_id: str):
         for node in nodes:
             for lang in LANGUAGES:
                 for speaker in SPEAKERS:
-                    # Clear Redis
-                    key = f"audio:{node.id}:{lang}:{speaker}"
+                    # Clear Redis (key format must match cache_service: node:lang:speaker:code_mix)
+                    key = f"audio:{node.id}:{lang}:{speaker}:0.00"
                     await redis_client.delete(key)
 
                     # Get text

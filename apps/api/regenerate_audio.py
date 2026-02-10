@@ -142,6 +142,10 @@ async def regenerate_story_audio(story_slug: str, language: str = "en"):
                     speaker=speaker,
                 )
 
+                if not audio_url:
+                    print(f"    ✗ Storage upload failed (not configured?), skipping DB save")
+                    continue
+
                 # Save to database
                 audio_file = AudioFile(
                     node_id=node.id,

@@ -23,6 +23,7 @@
     {
       "slug": "narrator",
       "name": "Ajji",
+      "name_translations": {"en": "Ajji", "hi": "अज्जी", "kn": "ಅಜ್ಜಿ"},
       "voice_profile": "warm_elderly",
       "bulbul_speaker": "meera",
       "avatar_url": "https://cdn.bhashakahani.com/characters/ajji.png"
@@ -30,6 +31,7 @@
     {
       "slug": "punyakoti",
       "name": "Punyakoti",
+      "name_translations": {"en": "Punyakoti", "hi": "पुण्यकोटि", "kn": "ಪುಣ್ಯಕೋಟಿ"},
       "voice_profile": "gentle_female",
       "bulbul_speaker": "pooja",
       "avatar_url": "https://cdn.bhashakahani.com/characters/punyakoti.png"
@@ -37,6 +39,7 @@
     {
       "slug": "tiger",
       "name": "Arbhuta",
+      "name_translations": {"en": "Arbhuta", "hi": "अर्भुत", "kn": "ಅರ್ಭುತ"},
       "voice_profile": "fierce_male",
       "bulbul_speaker": "amol",
       "avatar_url": "https://cdn.bhashakahani.com/characters/tiger.png"

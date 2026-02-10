@@ -78,6 +78,7 @@ async def seed_database():
                     story_id=story.id,
                     slug=char_data["slug"],
                     name=char_data["name"],
+                    name_translations=char_data.get("name_translations", {}),
                     voice_profile=char_data["voice_profile"],
                     bulbul_speaker=char_data["bulbul_speaker"],
                     avatar_url=char_data.get("avatar_url")

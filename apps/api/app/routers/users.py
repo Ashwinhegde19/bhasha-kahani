@@ -134,7 +134,9 @@ async def update_progress(
         db.add(progress)
     else:
         progress.current_node_id = current_node_id
-        progress.play_count += 1
+        # Only increment play_count when starting from the beginning
+        if current_node.is_start:
+            progress.play_count += 1
         progress.total_time_sec += max(0, time_spent_sec)
         progress.last_played_at = datetime.now(timezone.utc)
 

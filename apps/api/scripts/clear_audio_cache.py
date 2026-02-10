@@ -44,7 +44,7 @@ async def clear_audio_for_story(story_id: str, language: str = None):
         # Delete Redis keys
         keys_deleted = 0
         for audio_file in audio_files:
-            key = f"audio:{audio_file.node_id}:{audio_file.language_code}:{audio_file.speaker_id}"
+            key = f"audio:{audio_file.node_id}:{audio_file.language_code}:{audio_file.speaker_id}:0.00"
             deleted = await redis_client.delete(key)
             keys_deleted += deleted
             print(f"Deleted Redis key: {key}")

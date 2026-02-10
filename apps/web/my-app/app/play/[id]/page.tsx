@@ -2,7 +2,7 @@
 
 import { useParams, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -46,7 +46,40 @@ function getCharacterColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export default function PlayStoryPage() {
+// Friendly display names for voice profiles
+const VOICE_DISPLAY_NAMES: Record<string, string> = {
+  warm_elderly: 'Storyteller',
+  gentle_female: 'Gentle Voice',
+  fierce_male: 'Bold Voice',
+  young_energetic: 'Lively Voice',
+  calm_male: 'Calm Voice',
+  cheerful_female: 'Cheerful Voice',
+};
+
+// Get a friendly display name for a character
+function getCharacterDisplayName(character: NonNullable<StoryNode['character']>): string {
+  // Use the bulbul_speaker name (capitalized) as the primary display name
+  if (character.bulbul_speaker) {
+    return character.bulbul_speaker.charAt(0).toUpperCase() + character.bulbul_speaker.slice(1);
+  }
+  return character.name;
+}
+
+// Get voice style label
+function getVoiceLabel(voiceProfile?: string): string {
+  if (!voiceProfile) return 'narrator';
+  return VOICE_DISPLAY_NAMES[voiceProfile] || voiceProfile.replace(/_/g, ' ');
+}
+
+// Check if an audio URL is actually playable (not empty or placeholder)
+function isValidAudioUrl(url?: string | null): boolean {
+  if (!url || !url.trim()) return false;
+  // Reject placeholder URLs that point to non-existent CDNs
+  if (url.includes('audio.bhashakahani.com') && url.includes('/generated/')) return false;
+  return true;
+}
+
+function PlayStoryPageInner() {
   const params = useParams();
   const searchParams = useSearchParams();
   const storyId = params.id as string;
@@ -60,6 +93,10 @@ export default function PlayStoryPage() {
   const usingSpeechRef = useRef(false);
   const autoPlayNextRef = useRef(false);
   const playingNodeIdRef = useRef<string | null>(null);
+
+  // Refs to avoid stale closures in audio callbacks
+  const currentNodeIndexRef = useRef(currentNodeIndex);
+  const totalNodesRef = useRef(0);
 
   // Get user language preference
   const { language: storedLanguage, setLanguage } = useUserStore();
@@ -90,6 +127,10 @@ export default function PlayStoryPage() {
   const currentNode = narrationNodes[currentNodeIndex];
   const totalNodes = narrationNodes.length;
 
+  // Keep refs in sync
+  currentNodeIndexRef.current = currentNodeIndex;
+  totalNodesRef.current = totalNodes;
+
   // Get audio for current node
   const { data: nodeAudio, isLoading: audioLoading } = useQuery({
     queryKey: ['node-audio', currentNode?.id, selectedLanguage],
@@ -119,6 +160,15 @@ export default function PlayStoryPage() {
     retry: false,
   });
 
+  // Advance to next node (uses refs to avoid stale closure)
+  const advanceToNextNode = useCallback(() => {
+    if (autoPlayNextRef.current && currentNodeIndexRef.current < totalNodesRef.current - 1) {
+      setCurrentNodeIndex((prev) => prev + 1);
+    } else {
+      setHasListenedToLast(true);
+    }
+  }, []);
+
   // Play audio
   const playAudio = useCallback((audioUrl: string, nodeId?: string) => {
     // Prevent duplicate play attempts on the same node
@@ -140,26 +190,25 @@ export default function PlayStoryPage() {
     const audio = new Audio(audioUrl);
     audio.onended = () => {
       playingNodeIdRef.current = null;
+      audioRef.current = null;
       setPlaying(false);
-      if (autoPlayNextRef.current && currentNodeIndex < narrationNodes.length - 1) {
-        setCurrentNodeIndex((prev) => prev + 1);
-      } else {
-        setHasListenedToLast(true);
-      }
+      advanceToNextNode();
     };
     audio.onerror = () => {
       playingNodeIdRef.current = null;
+      audioRef.current = null;
       setPlaying(false);
     };
     audio.play().catch(() => {
       playingNodeIdRef.current = null;
+      audioRef.current = null;
       setPlaying(false);
     });
     audioRef.current = audio;
     setPlaying(true);
-  }, [currentNodeIndex, narrationNodes.length]);
+  }, [advanceToNextNode]);
 
-  const playFallbackSpeech = useCallback((text: string, nodeId?: string) => {
+  const playFallbackSpeech = useCallback((text: string, langCode: string, nodeId?: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     if (!text.trim()) return;
     if (nodeId && playingNodeIdRef.current === nodeId) return;
@@ -176,9 +225,9 @@ export default function PlayStoryPage() {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang =
-      selectedLanguage === 'hi'
+      langCode === 'hi'
         ? 'hi-IN'
-        : selectedLanguage === 'kn'
+        : langCode === 'kn'
         ? 'kn-IN'
         : 'en-IN';
     utterance.rate = 0.95;
@@ -189,11 +238,7 @@ export default function PlayStoryPage() {
       speechRef.current = null;
       playingNodeIdRef.current = null;
       setPlaying(false);
-      if (autoPlayNextRef.current && currentNodeIndex < narrationNodes.length - 1) {
-        setCurrentNodeIndex((prev) => prev + 1);
-      } else {
-        setHasListenedToLast(true);
-      }
+      advanceToNextNode();
     };
 
     utterance.onerror = () => {
@@ -206,25 +251,28 @@ export default function PlayStoryPage() {
     speechRef.current = utterance;
     window.speechSynthesis.speak(utterance);
     setPlaying(true);
-  }, [selectedLanguage, currentNodeIndex, narrationNodes.length]);
+  }, [advanceToNextNode]);
 
   // Auto-play on node change
   useEffect(() => {
-    if (autoPlayNextRef.current && !audioLoading) {
+    if (autoPlayNextRef.current && !audioLoading && currentNode) {
       const timer = setTimeout(() => {
+        // Only auto-play if nothing is currently playing
         const isHtmlAudioIdle =
           !audioRef.current || audioRef.current.paused || audioRef.current.ended;
-        if (isHtmlAudioIdle && !usingSpeechRef.current) {
-          if (nodeAudio?.audio_url) {
-            playAudio(nodeAudio.audio_url, currentNode?.id);
-          } else if (currentNode?.text) {
-            playFallbackSpeech(currentNode.text, currentNode?.id);
-          }
+        if (!isHtmlAudioIdle || usingSpeechRef.current) return;
+        // Don't re-play the same node
+        if (playingNodeIdRef.current === currentNode.id) return;
+
+        if (isValidAudioUrl(nodeAudio?.audio_url)) {
+          playAudio(nodeAudio!.audio_url, currentNode.id);
+        } else if (currentNode.text) {
+          playFallbackSpeech(currentNode.text, selectedLanguage, currentNode.id);
         }
-      }, 100);
+      }, 150);
       return () => clearTimeout(timer);
     }
-  }, [nodeAudio, audioLoading, playAudio, playFallbackSpeech, currentNode]);
+  }, [currentNode?.id, audioLoading, nodeAudio, playAudio, playFallbackSpeech, currentNode, selectedLanguage]);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -241,17 +289,31 @@ export default function PlayStoryPage() {
     autoPlayNextRef.current = false;
   }, []);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   const handleLanguageChange = (langCode: string) => {
+    stopAudio();
     setSelectedLanguage(langCode);
     setLanguage(langCode);
     setCurrentNodeIndex(0);
-    stopAudio();
     setHasListenedToLast(false);
     queryClient.invalidateQueries({ queryKey: ['story', resolvedStorySlug] });
     queryClient.invalidateQueries({ queryKey: ['node-audio'] });
   };
 
   const handlePlayPause = () => {
+    // Stop speech synthesis
     if (
       playing &&
       usingSpeechRef.current &&
@@ -266,15 +328,19 @@ export default function PlayStoryPage() {
       autoPlayNextRef.current = false;
       return;
     }
+    // Pause HTML audio
     if (playing && audioRef.current) {
       audioRef.current.pause();
+      // Don't null audioRef so we can resume
       playingNodeIdRef.current = null;
       setPlaying(false);
       autoPlayNextRef.current = false;
       return;
     }
+    // Resume paused HTML audio
     if (audioRef.current && audioRef.current.paused && !audioRef.current.ended) {
       audioRef.current.play().catch(() => {
+        audioRef.current = null;
         playingNodeIdRef.current = null;
         setPlaying(false);
       });
@@ -282,13 +348,16 @@ export default function PlayStoryPage() {
       autoPlayNextRef.current = true;
       return;
     }
-    if (!nodeAudio?.audio_url && !currentNode?.text) return;
+    // Start fresh playback
+    if (!isValidAudioUrl(nodeAudio?.audio_url) && !currentNode?.text) return;
     autoPlayNextRef.current = true;
     playingNodeIdRef.current = null;
-    if (nodeAudio?.audio_url) {
-      playAudio(nodeAudio.audio_url, currentNode?.id);
+    // Clear any stale audio ref
+    audioRef.current = null;
+    if (isValidAudioUrl(nodeAudio?.audio_url)) {
+      playAudio(nodeAudio!.audio_url, currentNode?.id);
     } else if (currentNode?.text) {
-      playFallbackSpeech(currentNode.text, currentNode?.id);
+      playFallbackSpeech(currentNode.text, selectedLanguage, currentNode?.id);
     }
   };
 
@@ -449,11 +518,11 @@ export default function PlayStoryPage() {
           <div className="flex items-center gap-3 mb-5 animate-fade-in">
             <div
               className={cn(
-                'relative w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg ring-3 ring-white/50 dark:ring-black/20',
+                'relative w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg ring ring-white/50 dark:ring-black/20',
                 getCharacterColor(currentNode.character.name),
               )}
             >
-              {currentNode.character.name.charAt(0).toUpperCase()}
+              {getCharacterDisplayName(currentNode.character).charAt(0).toUpperCase()}
               {playing && (
                 <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-card shadow flex items-center justify-center">
                   <Volume2 className="w-3 h-3 text-primary animate-pulse" />
@@ -464,11 +533,11 @@ export default function PlayStoryPage() {
             <div className="relative glass-card rounded-xl px-4 py-2">
               <div className="absolute left-[-6px] top-1/2 -translate-y-1/2 w-3 h-3 rotate-45 bg-[oklch(0.995_0.004_80_/_0.7)] dark:bg-[oklch(0.22_0.035_50_/_0.6)] border-l border-b border-[oklch(0.91_0.025_75_/_0.5)] dark:border-[oklch(1_0_0_/_0.08)]" />
               <p className="font-semibold text-base leading-tight relative z-10">
-                {currentNode.character.name}
+                {getCharacterDisplayName(currentNode.character)}
               </p>
               <p className="text-xs text-muted-foreground relative z-10">
                 {LANGUAGES.find((l) => l.code === selectedLanguage)?.name} &middot;{' '}
-                {currentNode.character.voice_profile?.replace('_', ' ') || 'narrator'}
+                {getVoiceLabel(currentNode.character.voice_profile)}
               </p>
             </div>
           </div>
@@ -549,7 +618,7 @@ export default function PlayStoryPage() {
             ? 'Preparing cloud audio... instant voice is available now'
             : playing
             ? 'Now playing — auto-advances to next part'
-            : nodeAudio?.audio_url
+            : isValidAudioUrl(nodeAudio?.audio_url)
             ? 'Tap play to listen'
             : 'Tap play for instant voice mode'}
         </p>
@@ -607,5 +676,27 @@ export default function PlayStoryPage() {
         </p>
       </footer>
     </div>
+  );
+}
+
+export default function PlayStoryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-background dark:via-background dark:to-background flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-card shadow-lg flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-foreground">Loading story...</p>
+              <p className="text-sm text-muted-foreground">Preparing your experience</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <PlayStoryPageInner />
+    </Suspense>
   );
 }
