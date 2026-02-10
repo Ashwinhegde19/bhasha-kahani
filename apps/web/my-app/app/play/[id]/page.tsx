@@ -21,6 +21,11 @@ import { useUserStore } from '@/store';
 import { LANGUAGES } from '@/lib/constants';
 import { StoryNode } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  DecorativeCorner,
+  FloatingStar,
+  FloatingSparkle,
+} from '@/components/ui/decorative';
 
 // Generate consistent color for character names dynamically
 function getCharacterColor(name: string): string {
@@ -346,7 +351,7 @@ export default function PlayStoryPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50/30 dark:from-background dark:via-background dark:to-background flex flex-col">
       {/* Top Bar */}
-      <header className="sticky top-0 z-20 backdrop-blur-md bg-card/60 dark:bg-card/80 border-b border-border/40">
+      <header className="sticky top-0 z-20 glass-card border-b-0 relative">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           {/* Back + Title */}
           <div className="flex items-center gap-2 min-w-0">
@@ -374,8 +379,8 @@ export default function PlayStoryPage() {
                 className={cn(
                   'px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer',
                   selectedLanguage === lang.code
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-card dark:bg-secondary/50 text-muted-foreground hover:text-foreground'
+                    ? 'bg-gradient-to-r from-primary to-rose-500 text-white shadow-sm'
+                    : 'bg-card dark:bg-secondary/50 text-muted-foreground hover:text-foreground',
                 )}
               >
                 <span className="mr-0.5">{lang.flag}</span>
@@ -384,6 +389,9 @@ export default function PlayStoryPage() {
             ))}
           </div>
         </div>
+
+        {/* Gradient bottom border */}
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden="true" />
 
         {/* Progress Bar */}
         <div className="h-1 bg-muted/50">
@@ -401,53 +409,64 @@ export default function PlayStoryPage() {
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
             Part {currentNodeIndex + 1} of {totalNodes}
           </span>
-          {/* Step dots for short stories */}
+          {/* Step dots with connecting lines */}
           {totalNodes <= 20 && (
-            <div className="flex items-center gap-0.5 ml-2">
+            <div className="flex items-center ml-2">
               {narrationNodes.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    stopAudio();
-                    setCurrentNodeIndex(i);
-                    setHasListenedToLast(false);
-                  }}
-                  className={cn(
-                    'rounded-full transition-all duration-300',
-                    i === currentNodeIndex
-                      ? 'w-5 h-2 bg-primary'
-                      : i < currentNodeIndex
-                      ? 'w-2 h-2 bg-primary/40'
-                      : 'w-2 h-2 bg-muted-foreground/20'
+                <div key={i} className="flex items-center">
+                  <button
+                    onClick={() => {
+                      stopAudio();
+                      setCurrentNodeIndex(i);
+                      setHasListenedToLast(false);
+                    }}
+                    className={cn(
+                      'rounded-full transition-all duration-300 relative z-10',
+                      i === currentNodeIndex
+                        ? 'w-4 h-4 bg-gradient-to-br from-primary to-rose-500 shadow-md ring-2 ring-primary/30'
+                        : i < currentNodeIndex
+                        ? 'w-3 h-3 bg-primary/50'
+                        : 'w-3 h-3 bg-muted-foreground/20',
+                    )}
+                    aria-label={`Go to part ${i + 1}`}
+                  />
+                  {i < narrationNodes.length - 1 && (
+                    <div
+                      className={cn(
+                        'w-3 h-0.5 transition-colors duration-300',
+                        i < currentNodeIndex ? 'bg-primary/40' : 'bg-muted-foreground/10',
+                      )}
+                    />
                   )}
-                  aria-label={`Go to part ${i + 1}`}
-                />
+                </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Character Badge */}
+        {/* Character Badge with Speech Bubble */}
         {currentNode?.character && (
           <div className="flex items-center gap-3 mb-5 animate-fade-in">
             <div
               className={cn(
-                'relative w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md',
-                getCharacterColor(currentNode.character.name)
+                'relative w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg ring-3 ring-white/50 dark:ring-black/20',
+                getCharacterColor(currentNode.character.name),
               )}
             >
               {currentNode.character.name.charAt(0).toUpperCase()}
               {playing && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-card shadow flex items-center justify-center">
-                  <Volume2 className="w-2.5 h-2.5 text-primary animate-pulse" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-card shadow flex items-center justify-center">
+                  <Volume2 className="w-3 h-3 text-primary animate-pulse" />
                 </span>
               )}
             </div>
-            <div>
-              <p className="font-semibold text-base leading-tight">
+            {/* Speech bubble */}
+            <div className="relative glass-card rounded-xl px-4 py-2">
+              <div className="absolute left-[-6px] top-1/2 -translate-y-1/2 w-3 h-3 rotate-45 bg-[oklch(0.995_0.004_80_/_0.7)] dark:bg-[oklch(0.22_0.035_50_/_0.6)] border-l border-b border-[oklch(0.91_0.025_75_/_0.5)] dark:border-[oklch(1_0_0_/_0.08)]" />
+              <p className="font-semibold text-base leading-tight relative z-10">
                 {currentNode.character.name}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground relative z-10">
                 {LANGUAGES.find((l) => l.code === selectedLanguage)?.name} &middot;{' '}
                 {currentNode.character.voice_profile?.replace('_', ' ') || 'narrator'}
               </p>
@@ -455,18 +474,18 @@ export default function PlayStoryPage() {
           </div>
         )}
 
-        {/* Story Text Card */}
-        <div
-          className="w-full bg-card/90 dark:bg-card backdrop-blur rounded-2xl shadow-lg
-                     border border-border/40 p-6 sm:p-8 mb-6 min-h-[160px] flex items-center justify-center
-                     transition-all duration-300"
-        >
+        {/* Story Text Card — Book Page */}
+        <div className="w-full book-page rounded-2xl shadow-lg border border-border/40 p-6 sm:p-8 mb-6 min-h-[160px] flex items-center justify-center transition-all duration-300 relative overflow-hidden">
+          <DecorativeCorner position="top-left" />
+          <DecorativeCorner position="top-right" />
+          <DecorativeCorner position="bottom-left" />
+          <DecorativeCorner position="bottom-right" />
           {currentNode?.text ? (
-            <p className="text-xl sm:text-2xl md:text-[1.7rem] leading-relaxed font-medium text-foreground/90 text-center story-text">
+            <p className="text-xl sm:text-2xl md:text-[1.7rem] leading-relaxed font-medium text-foreground/90 text-center story-text relative z-10">
               {currentNode.text}
             </p>
           ) : (
-            <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
+            <div className="flex flex-col items-center gap-2 text-muted-foreground/50 relative z-10">
               <Loader2 className="w-6 h-6 animate-spin" />
               <span className="text-sm">Loading text...</span>
             </div>
@@ -479,8 +498,8 @@ export default function PlayStoryPage() {
           <button
             onClick={goToPrev}
             disabled={currentNodeIndex === 0}
-            className="w-11 h-11 rounded-full bg-card shadow-sm border border-border/40 flex items-center justify-center
-                       text-muted-foreground hover:text-foreground hover:bg-accent hover:shadow-md
+            className="w-11 h-11 rounded-full glass-card shadow-sm flex items-center justify-center
+                       text-muted-foreground hover:text-foreground hover:shadow-md
                        disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             aria-label="Previous part"
           >
@@ -492,10 +511,10 @@ export default function PlayStoryPage() {
             <button
               onClick={handlePlayPause}
               className={cn(
-                'w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer border-2',
+                'sparkle-button w-[4.5rem] h-[4.5rem] rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer border-2',
                 playing
-                  ? 'bg-primary text-primary-foreground border-primary/30 shadow-xl playing-glow'
-                  : 'bg-card text-primary border-primary/10 hover:shadow-xl hover:border-primary/30'
+                  ? 'bg-gradient-to-br from-primary to-rose-500 text-white border-primary/30 shadow-xl playing-glow'
+                  : 'bg-card text-primary border-primary/10 hover:shadow-xl hover:border-primary/30',
               )}
               aria-label={playing ? 'Pause' : 'Play'}
             >
@@ -506,7 +525,7 @@ export default function PlayStoryPage() {
               )}
             </button>
           ) : (
-            <div className="w-16 h-16 rounded-full bg-card/60 shadow-lg border-2 border-border/20 flex items-center justify-center">
+            <div className="w-[4.5rem] h-[4.5rem] rounded-full glass-card shadow-lg border-2 border-border/20 flex items-center justify-center">
               <Loader2 className="w-7 h-7 animate-spin text-muted-foreground/50" />
             </div>
           )}
@@ -515,8 +534,8 @@ export default function PlayStoryPage() {
           <button
             onClick={goToNext}
             disabled={currentNodeIndex >= totalNodes - 1}
-            className="w-11 h-11 rounded-full bg-card shadow-sm border border-border/40 flex items-center justify-center
-                       text-muted-foreground hover:text-foreground hover:bg-accent hover:shadow-md
+            className="w-11 h-11 rounded-full glass-card shadow-sm flex items-center justify-center
+                       text-muted-foreground hover:text-foreground hover:shadow-md
                        disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             aria-label="Next part"
           >
@@ -535,22 +554,28 @@ export default function PlayStoryPage() {
             : 'Tap play for instant voice mode'}
         </p>
 
-        {/* Story Complete */}
+        {/* Story Complete Celebration */}
         {isStoryComplete && (
-          <div
-            className="w-full bg-gradient-to-br from-amber-50 to-orange-50 dark:from-primary/10 dark:to-primary/5
-                       rounded-2xl shadow-lg p-8 text-center border border-border/40 animate-fade-in"
-          >
-            <div className="text-5xl mb-3">🎉</div>
-            <h3 className="text-2xl font-bold text-foreground mb-1">Story Complete!</h3>
-            <p className="text-muted-foreground mb-6">
-              You finished <span className="font-semibold">&quot;{story.title}&quot;</span> in{' '}
+          <div className="w-full book-page rounded-2xl shadow-xl p-8 text-center border border-primary/20 animate-scale-fade-in relative overflow-hidden">
+            {/* Floating celebration sparkles */}
+            <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+              <FloatingStar className="absolute top-4 left-8 text-amber-400/50" size={18} delay="0s" />
+              <FloatingSparkle className="absolute top-6 right-12 text-rose-400/50" size={14} delay="0.3s" />
+              <FloatingStar className="absolute bottom-8 left-16 text-primary/40" size={12} delay="0.7s" />
+              <FloatingSparkle className="absolute bottom-4 right-8 text-violet-400/40" size={16} delay="1s" />
+              <FloatingStar className="absolute top-12 left-[40%] text-amber-300/30" size={10} delay="1.5s" />
+            </div>
+
+            <div className="text-6xl mb-4 animate-gentle-bounce relative z-10">&#127881;</div>
+            <h3 className="text-3xl font-extrabold gradient-text mb-2 relative z-10">Story Complete!</h3>
+            <p className="text-muted-foreground mb-6 text-lg relative z-10">
+              You finished <span className="font-bold">&quot;{story.title}&quot;</span> in{' '}
               {LANGUAGES.find((l) => l.code === selectedLanguage)?.name}
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <div className="flex flex-col sm:flex-row justify-center gap-3 relative z-10">
               <Button
                 size="lg"
-                className="rounded-full px-6"
+                className="sparkle-button rounded-full px-8 bg-gradient-to-r from-primary to-rose-500 text-white border-0"
                 onClick={() => {
                   setCurrentNodeIndex(0);
                   setHasListenedToLast(false);
@@ -562,7 +587,7 @@ export default function PlayStoryPage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="rounded-full px-6"
+                className="rounded-full px-8 glass-card"
                 asChild
               >
                 <Link href="/stories">
