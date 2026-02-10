@@ -90,7 +90,7 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 cd apps/web/my-app
 npm install
-cp .env.example .env.local  # Configure your env vars
+# Create .env.local file (see Environment Variables section)
 npm run dev
 ```
 
@@ -148,11 +148,13 @@ Once the backend is running, access the interactive API documentation:
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/stories` | List all stories |
-| `GET /api/stories/{slug}` | Get story details |
-| `GET /api/stories/{id}/nodes` | Get story nodes |
-| `POST /api/audio/generate` | Generate audio for text |
-| `GET /api/audio/{audio_id}` | Get audio file |
+| `GET /stories` | List all stories |
+| `GET /stories/{slug}` | Get story details |
+| `GET /audio/{node_id}` | Get audio for a story node |
+| `POST /audio/story/{story_id}/pre-generate` | Pre-generate audio for a story |
+| `POST /choices/{slug}/choices` | Submit a story choice |
+| `GET /users/progress` | Get user progress |
+| `POST /users/progress` | Save user progress |
 
 ## Deployment
 
